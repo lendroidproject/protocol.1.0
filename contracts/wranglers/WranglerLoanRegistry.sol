@@ -15,24 +15,28 @@ contract WranglerLoanRegistry is Ownable {
 
   function create(
     address[7] _addresses,
-    // _loanToken, _collateralToken,
-    // _tokenTransferProxyContractAddress, _tokenContractAddress,
-    // _lender, _borrower, _wrangler
-    uint256[7] _values,
-    // _collateralAmount, _loanAmountBorrowed, _loanAmountOwed, _expiresAtTimestamp,
-    // _monitoringFeeLST, _rollOverFeeLST, _closureFeeLST,
-    // nonce, wranglerApprovalExpiry
+    // lender, borrower, relayer, wrangler,
+    // collateralToken, loanToken,
+    // wranglerLoanRegistryContractAddress
+    uint[13] _values,
+    // collateralAmount,
+    // loanAmountOffered, interestRatePerDay, loanDuration, offerExpiryTimestamp,
+    // relayerFeeLST, monitoringFeeLST, rolloverFeeLST, closureFeeLST,
+    // creatorSalt,
+    // wranglerNonce, wranglerApprovalExpiry, loanAmountFilled
+    address[2] _contractAddresses,
     uint8 v,
     bytes32 r,
     bytes32 s
   ) external onlyOwner returns (bool) {
-    /* require(_values[8] > block.timestamp); */
-    /* uint256 currentNonce = nonces[_addresses[5]];
-    require(_values[7] == currentNonce + 1);
-    nonces[_addresses[5]] = currentNonce + 1; */
+    require(_values[11] > block.timestamp);
+    uint256 currentNonce = nonces[_addresses[1]];
+    require(_values[10] == currentNonce + 1);
+    nonces[_addresses[1]] = currentNonce + 1;
     address loanAddress = new Loan(
       _addresses,
       _values,
+      _contractAddresses,
       v,
       r,
       s

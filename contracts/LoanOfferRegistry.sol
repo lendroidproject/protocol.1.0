@@ -25,14 +25,17 @@ contract LoanOfferRegistry is Ownable {
         address lender;
         address borrower;
         address relayer;
-        address loanToken;
+        address wrangler;
         address collateralToken;
-        uint loanAmountOffered;
-        uint loanAmountToRepay;
-        uint expiresAtTimestamp;
-        uint collateralAmountOffered;
-        uint relayerFeeLST;
-        uint monitoringFeeLST;
+        address loanToken;
+        uint256 loanAmountOffered;
+        uint256 interestRatePerDay;
+        uint256 loanDuration;
+        uint256 offerExpiryTimestamp;
+        uint256 relayerFeeLST;
+        uint256 monitoringFeeLST;
+        uint256 rolloverFeeLST;
+        uint256 closureFeeLST;
         bytes32 offerHash;
     }
 
@@ -44,66 +47,72 @@ contract LoanOfferRegistry is Ownable {
 
   function fill(
     address[7] _addresses,
-    // relayer, wranglerLoanRegistryContractAddress,
-    // lender, borrower, wrangler, loanToken, collateralToken
+    // lender, borrower, relayer, wrangler,
+    // collateralToken, loanToken,
+    // wranglerLoanRegistryContractAddress
     uint[13] _values,
-    // collateralAmount, loanExpiresAtTimestamp,
-    // loanAmountBorrowed, loanAmountOwed, collateralAmountOffered, offerExpiresAt,
-    // relayerFeeLST, monitoringFeeLST,
-    // lenderSalt,
-    // rolloverFeeLST, closureFeeLST,
-    // wranglerSalt, wranglerApprovalExpiry
+    // collateralAmount,
+    // loanAmountOffered, interestRatePerDay, loanDuration, offerExpiryTimestamp,
+    // relayerFeeLST, monitoringFeeLST, rolloverFeeLST, closureFeeLST,
+    // creatorSalt,
+    // wranglerNonce, wranglerApprovalExpiry, loanAmountFilled
     uint8[2] _vS,
     bytes32[2] _rS,
     bytes32[2] _sS,
     bool _isOfferCreatorLender
   ) external returns (bool) {
-    // Get offer parameters from input
-    address[5] memory _offerAddresses = [_addresses[2], _addresses[3], _addresses[0],
-      _addresses[5], _addresses[6]
-    ];
-    uint256[7] memory _offerValues = [_values[2], _values[3], _values[4], _values[5],
-      _values[6], _values[7], _values[8]
-    ];
     // (re)create offer object
     Offer memory offer = Offer({
-      lender: _offerAddresses[0],
-      borrower: _offerAddresses[1],
-      relayer: _offerAddresses[2],
-      loanToken: _offerAddresses[3],
-      collateralToken: _offerAddresses[4],
-      loanAmountOffered: _offerValues[0],
-      loanAmountToRepay: _offerValues[1],
-      expiresAtTimestamp: _offerValues[2],
-      collateralAmountOffered: _offerValues[3],
-      relayerFeeLST: _offerValues[4],
-      monitoringFeeLST: _offerValues[5],
-      offerHash: computeOfferHash(_offerAddresses, _offerValues)
+      lender: _addresses[0],
+      borrower: _addresses[1],
+      relayer: _addresses[2],
+      wrangler: _addresses[3],
+      collateralToken: _addresses[4],
+      loanToken: _addresses[5],
+      loanAmountOffered: _values[1],
+      interestRatePerDay: _values[2],
+      loanDuration: _values[3],
+      offerExpiryTimestamp: _values[4],
+      relayerFeeLST: _values[5],
+      monitoringFeeLST: _values[6],
+      rolloverFeeLST: _values[7],
+      closureFeeLST: _values[8],
+      offerHash: computeOfferHash(_addresses, _values)
     });
-    // validate loan and collateral amounts
-    require(offer.loanAmountOffered > 0 && offer.loanAmountToRepay > 0 && offer.collateralAmountOffered > 0);
+    // validate _lender is not empty
+    require(offer.lender != address(0));
+    // validate _borrower is not empty
+    require(offer.borrower != address(1));
+    // validate _relayer is not empty
+    require(offer.relayer != address(2));
+    // validate _wrangler is not empty
+    require(offer.wrangler != address(3));
+    // validate _collateralToken is a contract address
+    require(_addresses[4].isContract());
+    // validate _loanToken is a contract address
+    require(_addresses[5].isContract());
+    // validate loan amounts
+    require(offer.loanAmountOffered > 0 && offer.interestRatePerDay > 0);
     // validate asked and offered expiry timestamps
-    require(block.timestamp >= offer.expiresAtTimestamp && block.timestamp >= _values[1] && offer.expiresAtTimestamp >= _values[1]);
+    require(block.timestamp >= offer.offerExpiryTimestamp);
     // validate signature of offer creator
     address offerCreator = _isOfferCreatorLender ? offer.lender : offer.borrower;
     require(offerCreator == ecrecover(offer.offerHash, _vS[0], _rS[0], _sS[0]));
     // fill offer with collateral
-    uint remainingCollateralAmount = offer.collateralAmountOffered.sub(getFilledOrCancelledCollateralAmount(offer.offerHash));
+    uint remainingCollateralAmount = _values[0].sub(getFilledOrCancelledCollateralAmount(offer.offerHash));
     require(remainingCollateralAmount >= _values[0]);
     filled[offer.offerHash] = filled[offer.offerHash].add(_values[0]);
     // Transfer input to wranglerLoanRegistryContractAddress
     require(_addresses[1].isContract());
-    // Get offer parameters from input
-    address[7] memory _loanAddresses = [_addresses[5], _addresses[6],
-      TOKEN_TRANSFER_PROXY_CONTRACT_ADDRESS, TOKEN_CONTRACT_ADDRESS,
-      _addresses[2], _addresses[3], _addresses[4]
+    // Create loan via WranglerLoanRegistry
+    address[2] memory _contractAddresses = [
+      TOKEN_TRANSFER_PROXY_CONTRACT_ADDRESS,
+      TOKEN_CONTRACT_ADDRESS
     ];
-    uint256[7] memory _loanValues = [_values[0], _values[2], _values[3], _values[5],
-      _values[7], _values[9], _values[10]
-    ];
-    WranglerLoanRegistry(_addresses[1]).create(
-      _loanAddresses,
-      _loanValues,
+    WranglerLoanRegistry(_addresses[6]).create(
+      _addresses,
+      _values,
+      _contractAddresses,
       _vS[1],
       _rS[1],
       _sS[1]
@@ -132,26 +141,28 @@ contract LoanOfferRegistry is Ownable {
     return filled[offerHash].add(cancelled[offerHash]);
   }
 
-  function computeOfferHash(address[5] _offerAddresses, uint[7] _offerValues)
+  function computeOfferHash(address[7] _addresses, uint[13] _values)
     public
     constant
     returns (bytes32)
   {
     return keccak256(
       address(this),
-      _offerAddresses[0], // lender
-      _offerAddresses[1], // borrower
-      _offerAddresses[2], // relayer
-      _offerAddresses[3], // loanToken
-      _offerAddresses[4], // collateralToken
-      _offerValues[0],    // loanAmountOffered
-      _offerValues[1],    // loanAmountToRepay
-      // Interest rate per day
-      _offerValues[2],    // expiresAtTimestamp
-      _offerValues[3],    // collateralAmountOffered
-      _offerValues[4],    // relayerFeeLST
-      _offerValues[5],    // monitoringFeeLST
-      _offerValues[6]    // salt
+      _addresses[0], // lender
+      _addresses[1], // borrower
+      _addresses[2], // relayer
+      _addresses[3], // wrangler
+      _addresses[4], // collateralToken
+      _addresses[5], // loanToken
+      _values[1],    // loanAmountOffered
+    //   _values[2],    // interestRatePerDay
+    //   _values[3],    // loanDuration
+      _values[4],    // offerExpiryTimestamp
+      _values[5],    // relayerFeeLST
+      _values[6],    // monitoringFeeLST
+      _values[7],    // rolloverFeeLST
+      _values[8],    // closureFeeLST
+      _values[9]     // creatorSalt
     );
   }
 
