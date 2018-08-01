@@ -43,8 +43,7 @@ contract LoanOfferRegistry is Ownable {
     }
 
   // constructor
-  function LoanOfferRegistry (address _token, address _tokenTransferProxy, address _loanRegistry) public {
-//   constructor(address _token, address _tokenTransferProxy, address _loanRegistry) public {
+  constructor(address _token, address _tokenTransferProxy, address _loanRegistry) public {
     TOKEN_CONTRACT_ADDRESS = _token;
     TOKEN_TRANSFER_PROXY_CONTRACT_ADDRESS = _tokenTransferProxy;
     LOAN_REGISTRY_CONTRACT_ADDRESS = _loanRegistry;
@@ -100,13 +99,12 @@ contract LoanOfferRegistry is Ownable {
     // validate asked and offered expiry timestamps
     require(offer.offerExpiryTimestamp >= block.timestamp);
     // validate signature of offer creator
-
     address offerCreator = _isOfferCreatorLender ? offer.lender : offer.borrower;
     require(offerCreator == ecrecover(offer.offerHash, _vS[0], _rS[0], _sS[0]));
-
+    // validate laon amount to be filled
+    uint filledOrCancelledLoanAmount = getFilledOrCancelledLoanAmount(offer.offerHash);
+    require(offer.loanAmountOffered.sub(filledOrCancelledLoanAmount) >= _values[12]);
     // fill offer with lending currency
-    uint remainingLoanAmount = getFilledOrCancelledLoanAmount(offer.offerHash);
-    require(remainingLoanAmount == 0);
     filled[offer.offerHash] = filled[offer.offerHash].add(_values[12]);
     // Transfer input to wranglerLoanRegistryContractAddress
     require(_addresses[6].isContract());
@@ -195,8 +193,8 @@ contract LoanOfferRegistry is Ownable {
     returns (bytes32)
   {
     address[6] memory offerAddresses = [
-      _isOfferCreatorLender ? _addresses[0] : address(0x0), // lender
-      _isOfferCreatorLender ? address(0x0) : _addresses[1], // borrower
+      _isOfferCreatorLender ? _addresses[0] : address(0), // lender
+      _isOfferCreatorLender ? address(0) : _addresses[1], // borrower
       _addresses[2], // relayer
       _addresses[3], // wrangler
       _addresses[4], // collateralToken
@@ -230,8 +228,6 @@ contract LoanOfferRegistry is Ownable {
       _addresses[4], // collateralToken
       _addresses[5], // loanToken
       _values[0],    // loanAmountOffered
-    //   _values[2],    // interestRatePerDay
-    //   _values[3],    // loanDuration
       _values[1],    // offerExpiryTimestamp
       _values[2],    // relayerFeeLST
       _values[3],    // monitoringFeeLST

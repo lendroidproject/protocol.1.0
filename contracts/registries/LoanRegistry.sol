@@ -13,11 +13,10 @@ contract LoanRegistry is Ownable {
   function recordLoan(address _lender, address _borrower, address loanAddress) external returns (bool) {
     lentLoans[_lender].push(loanAddress);
     borrowedLoans[_borrower].push(loanAddress);
+    return true;
   }
 
-  function getLoanCount(bytes32 _type) external view returns (uint256) {
-    if (_type == "lender") return lentLoans[msg.sender].length;
-    if (_type == "borrower") return borrowedLoans[msg.sender].length;
-    return 0;
+  function getLoanCounts(address _address) external view returns (uint256, uint256) {
+    return (lentLoans[_address].length, borrowedLoans[_address].length);
   }
 }

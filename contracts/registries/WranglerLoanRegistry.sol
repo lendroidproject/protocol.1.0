@@ -12,7 +12,7 @@ import {Loan} from "../loans/Loan.sol";
  */
 contract WranglerLoanRegistry is Ownable {
   using AddressUtils for address;
-    
+
   // contract addresses
   address public LOAN_CONTRACT_REGISTRY_CONTRACT_ADDRESS;
   // nonce for offerCreator
@@ -20,8 +20,7 @@ contract WranglerLoanRegistry is Ownable {
   mapping (address => bool) public loans;
 
   // constructor
-  function WranglerLoanRegistry(address _loanContractRegistry) public {
-//   constructor(address _loanContractRegistry) public {
+  constructor(address _loanContractRegistry) public {
     LOAN_CONTRACT_REGISTRY_CONTRACT_ADDRESS = _loanContractRegistry;
   }
 
@@ -42,6 +41,8 @@ contract WranglerLoanRegistry is Ownable {
     bytes32 r,
     bytes32 s
   ) external returns (address) {
+    // confirm wrangler is owner of this contract
+    require(_addresses[3] == owner);
     require(_values[11] > block.timestamp);
     uint256 currentNonce = nonces[offerCreator];
     require(_values[10] == currentNonce + 1);
@@ -49,25 +50,24 @@ contract WranglerLoanRegistry is Ownable {
     bool success;
     address loanAddress;
     Loan loan;
-    (success, loanAddress) = LoanContractRegistry(LOAN_CONTRACT_REGISTRY_CONTRACT_ADDRESS).releaseLastChild();
+    (success, loanAddress) = LoanContractRegistry(LOAN_CONTRACT_REGISTRY_CONTRACT_ADDRESS).releaseChild();
     loan = success ? Loan(loanAddress) : new Loan();
-    loan.init(
-      _addresses,
-      _values,
-      _contractAddresses,
-      v,
-      r,
-      s
-    );
+    require(loan.init(_addresses, _values, _contractAddresses));
+    // validate wrangler signature
+    bytes32 loanHash = loan.computeHash();
+    require(ecrecover(loanHash, v, r, s) == owner);
+    // save and return loan address
     loans[address(loan)] = true;
     return address(loan);
   }
 
   /**
-   * @dev transfer ownership of this contract to loanContractRegistry
+   * @dev transfer ownership of given loanAddress to loanContractRegistry
    */
   function releaseContract(address loanAddress) external returns (bool) {
     require(loanAddress.isContract());
+    require(loans[loanAddress]);
+    loans[loanAddress] = false;
     Loan loan = Loan(loanAddress);
     require(loan.borrower() == msg.sender);
     require(loan.owner() == address(this));
