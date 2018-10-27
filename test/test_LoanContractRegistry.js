@@ -18,7 +18,7 @@ contract("LoanContractRegistry", function (addresses) {
   });
 
   it("should `isChild` return `false`", async function () {
-    this.contract.isChild(addresses[3]).equal(true);
+    this.contract.isChild(addresses[3]).equal(false);
   });
 
   it("should `addChild` return `true`", async function () {
