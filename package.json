@@ -12,7 +12,9 @@
     "chai-bignumber": "^2.0.2",
     "zeppelin-solidity": "^1.11.0"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "mocha": "^5.2.0"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
