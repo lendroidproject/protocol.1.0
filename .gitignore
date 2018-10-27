@@ -5,5 +5,3 @@
 /coverage
 coverage.json
 .solcover.js
-
-/contracts/loans
