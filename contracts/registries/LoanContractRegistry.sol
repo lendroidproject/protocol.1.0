@@ -14,6 +14,16 @@ contract LoanContractRegistry is Ownable {
   mapping (uint256 => address) public children;
   uint256 public lastChild = 0;
 
+  event AddChild(
+    address contractAddress,
+    bool success
+  );
+
+  event ReleaseChild(
+    address contractAddress,
+    bool success
+  );
+
   function isChild(address _contractAddress) internal view returns (bool) {
     return Ownable(_contractAddress).owner() == address(this);
   }
@@ -24,6 +34,9 @@ contract LoanContractRegistry is Ownable {
     assert(!isChild(_contractAddress));
     lastChild ++;
     children[lastChild] = _contractAddress;
+
+    emit AddChild(_contractAddress, true);
+
     return true;
   }
 
@@ -31,11 +44,14 @@ contract LoanContractRegistry is Ownable {
     if (lastChild == 0) return (false, address(0));
     address _contractAddress = children[lastChild];
     require(_contractAddress.isContract());
-    assert(isChild(_contractAddress));
+    // assert(isChild(_contractAddress));
     // Clean up the list
     delete children[lastChild];
     lastChild --;
-    Ownable(_contractAddress).transferOwnership(msg.sender);
+    // Ownable(_contractAddress).transferOwnership(msg.sender);
+    
+    emit ReleaseChild(_contractAddress, true);
+    
     return (true, _contractAddress);
   }
 

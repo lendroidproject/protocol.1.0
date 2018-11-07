@@ -1,39 +1,52 @@
-var LoanContractRegistry = artifacts.require("LoanContractRegistry");
+require('chai').should();
 
-const BigNumber = web3.BigNumber;
-require('chai')
-  .use(require('chai-as-promised'))
-  .use(require('chai-bignumber')(BigNumber))
-  .should();
+var LoanContractRegistry = artifacts.require("LoanContractRegistry");
+var DummyContract = artifacts.require("DummyContract");
+
+const { assertRevert } = require('./helpers/assertRevert');
 
 contract("LoanContractRegistry", function (addresses) {
   beforeEach(async function () {
-    this.contract = await LoanContractRegistry.new(addresses[0]);
-    this.contract.addChild(addresses[1]);
-    this.contract.addChild(addresses[2]);
+    this.contract = await LoanContractRegistry.new();
+
+    this.testContract = await DummyContract.new({ from: addresses[0] });
+    this.testContract1 = await DummyContract.new({ from: addresses[1] });
+    this.testContract2 = await DummyContract.new({ from: addresses[2] });
   });
 
-  it("should `isChild` return `true`", async function () {
-    this.contract.isChild(addresses[1]).equal(true);
+  describe('1. AddChild', function () {
+    it("should success", async function () {
+      const res = await this.contract.addChild(this.testContract.address);
+
+      const { logs } = res;
+      logs.length.should.eq(1);
+
+      const log = logs[0];
+      log.event.should.eq('AddChild');
+      log.args.contractAddress.should.eq(this.testContract.address);
+      log.args.success.should.eq(true);
+    });
+    it("should be failed", async function () {
+      await assertRevert(this.contract.addChild(this.testContract.address, { from: addresses[1] }));
+    });
   });
 
-  it("should `isChild` return `false`", async function () {
-    this.contract.isChild(addresses[3]).equal(false);
-  });
+  describe('2. ReleaseChild', function () {
+    it("should success", async function () {
+      await this.contract.addChild(this.testContract1.address, { from: addresses[1] });
+      const res = await this.contract.releaseChild();
 
-  it("should `addChild` return `true`", async function () {
-    this.contract.addChild(addresses[3]).equal(true);
-  });
+      const { logs } = res;
+      logs.length.should.eq(1);
 
-  it("should `addChild` be failed", async function () {
-    this.contract.addChild(addresses[1]).not.equal(true);
-  });
-
-  it("should `releaseChild` return `true` and its address", async function () {
-    this.contract.releaseChild(addresses[2]).equal(true, addresses[2]);
-  });
-
-  it("should `releaseChild` be failed", async function () {
-    this.contract.releaseChild(addresses[3]).not.equal(true, addresses[3]);
+      const log = logs[0];
+      log.event.should.eq('ReleaseChild');
+      log.args.contractAddress.should.eq(this.testContract1.address);
+      log.args.success.should.eq(true);
+    });
+    it("should return `false`", async function () {
+      const res = await this.contract.releaseChild();
+      res.should.have.property('tx').with.lengthOf(66);
+    });
   });
 });
