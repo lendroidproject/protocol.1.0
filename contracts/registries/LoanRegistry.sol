@@ -10,9 +10,19 @@ contract LoanRegistry is Ownable {
   mapping (address => address[]) public borrowedLoans;
   mapping (address => address[]) public lentLoans;
 
+  event RecordLoan(
+    address lender,
+    address borrower,
+    address loanAddress,
+    bool success
+  );
+
   function recordLoan(address _lender, address _borrower, address loanAddress) external returns (bool) {
     lentLoans[_lender].push(loanAddress);
     borrowedLoans[_borrower].push(loanAddress);
+
+    emit RecordLoan(_lender, _borrower, loanAddress, true);
+
     return true;
   }
 
