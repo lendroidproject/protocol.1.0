@@ -1,10 +1,11 @@
-pragma solidity ^0.4.18;
+pragma solidity 0.4.24;
 
-import "zeppelin-solidity/contracts/math/SafeMath.sol";
-import "zeppelin-solidity/contracts/ownership/Ownable.sol";
-import "zeppelin-solidity/contracts/AddressUtils.sol";
-import "zeppelin-solidity/contracts/token/ERC20/ERC20.sol";
-import {TokenTransferProxy} from "../TokenTransferProxy.sol";
+import "openzeppelin-solidity/contracts/math/SafeMath.sol";
+import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
+import "openzeppelin-solidity/contracts/utils/Address.sol";
+import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
+
+import {Registry} from "./Registry.sol";
 
 
 /**
@@ -12,9 +13,9 @@ import {TokenTransferProxy} from "../TokenTransferProxy.sol";
  * @dev the creator is always the SimpleWrangler contract
  */
 
-contract Loan is Ownable {
+contract SimpleLoan is Ownable {
   using SafeMath for uint256;
-  using AddressUtils for address;
+  using Address for address;
 
   // players
   address public lender;
@@ -30,15 +31,14 @@ contract Loan is Ownable {
   uint256 public loanAmountBorrowed; // Principal amount
   uint256 public loanAmountOwed; // Principal + interest (i.e., calculated beforehand)
   // loan nonce
-  uint256 nonce;
+  uint256 public nonce;
   // fees
   uint256 public relayerFeeLST; // Set by Lender for Relayer
   uint256 public monitoringFeeLST; // Set by Lender for Wrangler
   uint256 public rolloverFeeLST; // Set by Borrower for Wrangler
   uint256 public closureFeeLST; // Set by Borrower for Borrower
   // contract addresses
-  address public TOKEN_TRANSFER_PROXY_CONTRACT_ADDRESS;
-  address public TOKEN_CONTRACT_ADDRESS;
+  address public REGISTRY_CONTRACT_ADDRESS;
   // invariants
   uint256 public DECIMALS = 10 ** 18;
   uint256 public SECONDS_PER_DAY = 86400;
@@ -64,14 +64,14 @@ contract Loan is Ownable {
     address[7] _addresses,
     // lender, borrower, relayer, wrangler,
     // collateralToken, loanToken,
-    // wranglerLoanRegistryContractAddress
+    // SimplewranglerAddress
     uint[13] _values,
     // collateralAmount,
     // loanAmountOffered, interestRatePerDay, loanDuration, offerExpiryTimestamp,
     // relayerFeeLST, monitoringFeeLST, rolloverFeeLST, closureFeeLST,
     // creatorSalt,
     // wranglerNonce, wranglerApprovalExpiry, loanAmountFilled
-    address[2] _contractAddresses
+    address _registryContractAddress
   ) external returns (bool)
 //   ) external
   {
@@ -105,13 +105,11 @@ contract Loan is Ownable {
     rolloverFeeLST = _values[7];
     closureFeeLST = _values[8];
     // set contract addresses
-    require(_contractAddresses[0].isContract());
-    require(_contractAddresses[1].isContract());
-    TOKEN_TRANSFER_PROXY_CONTRACT_ADDRESS = _contractAddresses[0];
-    TOKEN_CONTRACT_ADDRESS = _contractAddresses[1];
-    // // transfer collateral token from borrower to this address
+    require(_registryContractAddress.isContract());
+    REGISTRY_CONTRACT_ADDRESS = _registryContractAddress;
+    // transfer collateral token from borrower to this address
     require(
-      TokenTransferProxy(TOKEN_TRANSFER_PROXY_CONTRACT_ADDRESS).transferFrom(
+      Registry(REGISTRY_CONTRACT_ADDRESS).getTokenTransferProxy().transferFrom(
         collateralToken,
         borrower,
         address(this),
@@ -120,7 +118,7 @@ contract Loan is Ownable {
     );
     // transfer loan token from lender to borrower
     require(
-      TokenTransferProxy(TOKEN_TRANSFER_PROXY_CONTRACT_ADDRESS).transferFrom(
+      Registry(REGISTRY_CONTRACT_ADDRESS).getTokenTransferProxy().transferFrom(
         loanToken,
         lender,
         borrower,
@@ -129,8 +127,8 @@ contract Loan is Ownable {
     );
     // transfer monitoringFeeLST from lender to wrangler
     require(
-      TokenTransferProxy(TOKEN_TRANSFER_PROXY_CONTRACT_ADDRESS).transferFrom(
-        TOKEN_CONTRACT_ADDRESS,
+      Registry(REGISTRY_CONTRACT_ADDRESS).getTokenTransferProxy().transferFrom(
+        Registry(REGISTRY_CONTRACT_ADDRESS).TOKEN_CONTRACT_ADDRESS(),
         lender,
         wrangler,
         monitoringFeeLST
@@ -183,7 +181,7 @@ contract Loan is Ownable {
     assert(status == Status.OPEN);
     // transfer loan token from borrower to lender
     require(
-      TokenTransferProxy(TOKEN_TRANSFER_PROXY_CONTRACT_ADDRESS).transferFrom(
+      Registry(REGISTRY_CONTRACT_ADDRESS).getTokenTransferProxy().transferFrom(
         loanToken,
         borrower,
         lender,
@@ -221,7 +219,7 @@ contract Loan is Ownable {
     collateralAmount = collateralAmount.add(_amount);
     // transfer collateral token from sender (aka, borrower) to this address
     require(
-      TokenTransferProxy(TOKEN_TRANSFER_PROXY_CONTRACT_ADDRESS).transferFrom(
+      Registry(REGISTRY_CONTRACT_ADDRESS).getTokenTransferProxy().transferFrom(
         _collateralToken,
         msg.sender,
         address(this),

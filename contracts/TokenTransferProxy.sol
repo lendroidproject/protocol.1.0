@@ -21,10 +21,10 @@
   Several parts of the original work have been modified to fit the specifications of the Lendroid Foundation
 */
 
-pragma solidity ^0.4.18;
+pragma solidity 0.4.24;
 
-import "zeppelin-solidity/contracts/ownership/Ownable.sol";
-import { StandardToken as Token } from "zeppelin-solidity/contracts/token/ERC20/StandardToken.sol";
+import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
+import { ERC20 as Token } from "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 
 
 /// @title TokenTransferProxy - Inspired from 0xProject. Transfers tokens on behalf of contracts.

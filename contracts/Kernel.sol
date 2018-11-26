@@ -1,25 +1,22 @@
-pragma solidity ^0.4.18;
+pragma solidity 0.4.24;
 
-import "zeppelin-solidity/contracts/math/SafeMath.sol";
-import "zeppelin-solidity/contracts/ownership/Ownable.sol";
-import "zeppelin-solidity/contracts/AddressUtils.sol";
+import "openzeppelin-solidity/contracts/math/SafeMath.sol";
+import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
+import "openzeppelin-solidity/contracts/utils/Address.sol";
 
-import {TokenTransferProxy} from "../TokenTransferProxy.sol";
-import {LoanRegistry} from "./LoanRegistry.sol";
-import {WranglerLoanRegistry} from "./WranglerLoanRegistry.sol";
+import {Registry} from "./Registry.sol";
+import {SimpleWrangler} from "./SimpleWrangler.sol";
 
 
 /**
- * @title LoanOfferRegistry contract
- * @dev Fills or cancels loan offers created by lender. WranglerLoanRegistry then creates Loans approved by the wrangler
+ * @title Kernel contract
+ * @dev Fills or cancels loan kernels. SimpleWrangler then creates Loans approved by the wrangler script
  */
-contract LoanOfferRegistry is Ownable {
+contract Kernel is Ownable {
   using SafeMath for uint256;
-  using AddressUtils for address;
+  using Address for address;
   // contract addresses
-  address public TOKEN_TRANSFER_PROXY_CONTRACT_ADDRESS;
-  address public TOKEN_CONTRACT_ADDRESS;
-  address public LOAN_REGISTRY_CONTRACT_ADDRESS;
+  address public REGISTRY_CONTRACT_ADDRESS;
   // Mappings of offerHash => amounts of collateralTokenAmount filled or cancelled.
   mapping (bytes32 => uint) public filled;
   mapping (bytes32 => uint) public cancelled;
@@ -43,12 +40,20 @@ contract LoanOfferRegistry is Ownable {
     }
 
   // constructor
-  constructor(address _token, address _tokenTransferProxy, address _loanRegistry) public {
-    TOKEN_CONTRACT_ADDRESS = _token;
-    TOKEN_TRANSFER_PROXY_CONTRACT_ADDRESS = _tokenTransferProxy;
-    LOAN_REGISTRY_CONTRACT_ADDRESS = _loanRegistry;
+  constructor(address _registry) public {
+    REGISTRY_CONTRACT_ADDRESS = _registry;
   }
 
+  /**
+    * @dev fill a loan kernel. A kernel can be created only by a lender or a borrower.
+    * If created by a lender, it's a lend order, otherwise a borrow order.
+    * @param _addresses An array of 7 addresses approved by the wrangler
+    * @param _values An array of 13 uint values approved by the wrangler
+    * @param _vS Array of two uint8 values; one "v" from creator's signature and another from wrangler's
+    * @param _rS Array of two bytes32 values; one "r" from creator's signature and another from wrangler's
+    * @param _sS Array of two bytes32 values; one "s" from creator's signature and another from wrangler's
+    * @param _isOfferCreatorLender boolean set by the wrangler
+  */
   function fill(
     address[7] _addresses,
     // lender, borrower, relayer, wrangler,
@@ -65,7 +70,7 @@ contract LoanOfferRegistry is Ownable {
     bytes32[2] _sS,
     bool _isOfferCreatorLender
   ) external returns (bool) {
-    // (re)create offer object
+    // (re)create kernel object
     Offer memory offer = Offer({
       lender: _addresses[0],
       borrower: _addresses[1],
@@ -108,24 +113,25 @@ contract LoanOfferRegistry is Ownable {
     filled[offer.offerHash] = filled[offer.offerHash].add(_values[12]);
     // Transfer input to wranglerLoanRegistryContractAddress
     require(_addresses[6].isContract());
-    // Create loan via WranglerLoanRegistry
-    address loanAddress = WranglerLoanRegistry(_addresses[6]).create(
+    // Create loan via SimpleWrangler
+    address loanAddress = SimpleWrangler(_addresses[6]).create(
       offerCreator,
       _addresses,
       _values,
-      [TOKEN_TRANSFER_PROXY_CONTRACT_ADDRESS, TOKEN_CONTRACT_ADDRESS],
+      REGISTRY_CONTRACT_ADDRESS,
       _vS[1],
       _rS[1],
       _sS[1]
     );
-    require(LoanRegistry(LOAN_REGISTRY_CONTRACT_ADDRESS).recordLoan(
+    require(Registry(REGISTRY_CONTRACT_ADDRESS).getPosition().recordLoan(
       offer.lender, offer.borrower, loanAddress
     ));
     // transfer relayerFeeLST from lender to relayer
     if (offer.relayer != address(0)) {
       require(
-        TokenTransferProxy(TOKEN_TRANSFER_PROXY_CONTRACT_ADDRESS).transferFrom(
-          TOKEN_CONTRACT_ADDRESS,
+        Registry(REGISTRY_CONTRACT_ADDRESS).getTokenTransferProxy()
+          .transferFrom(
+          Registry(REGISTRY_CONTRACT_ADDRESS).TOKEN_CONTRACT_ADDRESS(),
           offer.lender,
           offer.relayer,
           offer.relayerFeeLST
@@ -136,6 +142,15 @@ contract LoanOfferRegistry is Ownable {
     return true;
   }
 
+  /**
+    * @dev cancel a partially-filled or unfilled loan kernel.
+    * @param _addresses An array of 6 addresses used in the kernel object
+    * @param _values An array of 9 uint values used in the kernel object
+    * @param _v from creator's signature
+    * @param _r from creator's signature
+    * @param _s from creator's signature
+    * @param cancelledLoanTokenAmount amount of loan currency to cancel
+  */
   function cancel(
     address[6] _addresses,
     uint[9] _values,
@@ -185,10 +200,18 @@ contract LoanOfferRegistry is Ownable {
     return filled[offerHash].add(cancelled[offerHash]);
   }
 
+  /**
+    * @dev compute the kernel hash from inputs sent to fill()
+    * This function is necessary to respect the variable limit on the EVM stack
+    * Called only by this contract
+    * @param _addresses An array of 7 addresses approved by the wrangler
+    * @param _values An array of 13 uint values approved by the wrangler
+    * @param _isOfferCreatorLender boolean set by the wrangler
+  */
   function computeOfferHashFromFillInputs(
     address[7] _addresses, uint[13] _values, bool _isOfferCreatorLender
   )
-    public
+    internal
     constant
     returns (bytes32)
   {
@@ -214,26 +237,34 @@ contract LoanOfferRegistry is Ownable {
     return computeOfferHash(offerAddresses, offerValues);
   }
 
+  /**
+    * @dev compute the kernel hash from properties that make up the kernel object.
+    * Called from both UI client and this contract
+    * @param _addresses An array of 6 addresses used in the kernel object
+    * @param _values An array of 9 uint values used in the kernel object
+  */
   function computeOfferHash(address[6] _addresses, uint[9] _values)
     public
     constant
     returns (bytes32)
   {
     return keccak256(
-      address(this),
-      _addresses[0], // lender
-      _addresses[1], // borrower
-      _addresses[2], // relayer
-      _addresses[3], // wrangler
-      _addresses[4], // collateralToken
-      _addresses[5], // loanToken
-      _values[0],    // loanAmountOffered
-      _values[1],    // offerExpiryTimestamp
-      _values[2],    // relayerFeeLST
-      _values[3],    // monitoringFeeLST
-      _values[4],    // rolloverFeeLST
-      _values[5],    // closureFeeLST
-      _values[6]     // creatorSalt
+      abi.encodePacked(
+        address(this),
+        _addresses[0], // lender
+        _addresses[1], // borrower
+        _addresses[2], // relayer
+        _addresses[3], // wrangler
+        _addresses[4], // collateralToken
+        _addresses[5], // loanToken
+        _values[0],    // loanAmountOffered
+        _values[1],    // offerExpiryTimestamp
+        _values[2],    // relayerFeeLST
+        _values[3],    // monitoringFeeLST
+        _values[4],    // rolloverFeeLST
+        _values[5],    // closureFeeLST
+        _values[6]     // creatorSalt
+      )
     );
   }
 

@@ -1,8 +1,8 @@
 {
   "name": "lendroid-protocol",
   "version": "1.0.0",
-  "description": "",
-  "main": ".solcover.js",
+  "description": "Version 1.0 of the Lendroid protocol",
+  "main": "truffle-config.js",
   "directories": {
     "test": "test"
   },
@@ -10,24 +10,25 @@
     "chai": "^4.1.2",
     "chai-as-promised": "^7.1.1",
     "chai-bignumber": "^2.0.2",
-    "zeppelin-solidity": "^1.11.0",
+    "openzeppelin-solidity": "^2.0.0",
+    "ganache-cli": "6.1.0",
+    "solidity-coverage": "0.5.4",
     "truffle": "4.1.14"
   },
-  "devDependencies": {
-    "mocha": "^5.2.0"
-  },
+  "devDependencies": {},
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "./node_modules/.bin/truffle test",
+    "test-cov": "./node_modules/.bin/solidity-coverage"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/vignesh-msundaram/protocol.1.0.git"
+    "url": "git+https://github.com/lendroidproject/protocol.1.0.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/vignesh-msundaram/protocol.1.0/issues"
+    "url": "https://github.com/lendroidproject/protocol.1.0/issues"
   },
-  "homepage": "https://github.com/vignesh-msundaram/protocol.1.0#readme"
+  "homepage": "https://github.com/lendroidproject/protocol.1.0#readme"
 }
