@@ -8,8 +8,16 @@ const Kernel = artifacts.require('Lazarus');
 
 module.exports = function(deployer, network, accounts) {
   var registry;
-  // deploy Registry
-  deployer.deploy(Registry)
+  // deploy vyper contracts
+  deployer.deploy(ERC20, "Lendroid Support Token", "LST", 18, 12000000000)
+  .then(function(tokenContract) {
+    console.log("Vyper Protocol token contract has been deployed");
+    return deployer.deploy(Protocol, tokenContract.address)
+  }).then(function(protocolContract) {
+    console.log("Vyper Protocol contract has been deployed");
+    // deploy Registry
+    return deployer.deploy(Registry)
+  })
   .then(function(registryInstance) {
     registry = registryInstance;
     console.log("Registry has been deployed");
