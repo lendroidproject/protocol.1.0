@@ -22,12 +22,11 @@ PositionStatusNotification: event({_wrangler: indexed(address), _position_hash: 
 PositionBorrowCurrencyNotification: event({_wrangler: indexed(address), _position_hash: indexed(bytes32), _notification_key: bytes[21], _notification_value: uint256})
 
 # Variables of the protocol.
-token_address: address(ERC20)
-position_template_address: public(address)
+protocol_token_address: address(ERC20)
 owner: public(address)
 # kernel
-kernels_filled: uint256(wei)[bytes32]
-kernels_cancelled: uint256(wei)[bytes32]
+kernels_filled: public(uint256(wei)[bytes32])
+kernels_cancelled: public(uint256(wei)[bytes32])
 # position
 positions: public({
     # players
@@ -43,7 +42,7 @@ positions: public({
     lend_currency_address: address,
     borrow_currency_value: uint256(wei),
     borrow_currency_current_value: uint256(wei),
-    lend_currency_borrowed_value: uint256(wei),
+    lend_currency_filled_value: uint256(wei),
     lend_currency_owed_value: uint256(wei),
     status: uint256,
     # nonce
@@ -61,8 +60,8 @@ borrow_positions: bytes32[uint256][address]
 lend_positions: bytes32[uint256][address]
 
 # wrangler
-wranglers: bool[address]
-wrangler_nonces: uint256[address][address]
+wranglers: public(bool[address])
+wrangler_nonces: public(uint256[address][address])
 
 # constants
 DECIMALS: public(uint256)
@@ -77,10 +76,9 @@ POSITION_TOPPED_DOWN: public(uint256)
 
 
 @public
-def __init__(_addresses: address[2]):
+def __init__(_protocol_token_address: address):
     self.owner = msg.sender
-    self.token_address = _addresses[0]
-    self.position_template_address = _addresses[1]
+    self.protocol_token_address = _protocol_token_address
     self.POSITION_THRESHOLD = 10
     self.DECIMALS = 10 ** 18
     self.SECONDS_PER_DAY = 86400
@@ -92,41 +90,51 @@ def __init__(_addresses: address[2]):
     self.POSITION_TOPPED_UP = 1
     self.POSITION_TOPPED_DOWN = 2
 
+
+@private
+def is_contract(_address: address) -> bool:
+    return (_address != ZERO_ADDRESS) and (_address.codesize > 0)
+
+
 @public
 def set_position_threshold(_value: uint256) -> bool:
     assert msg.sender == self.owner
     self.POSITION_THRESHOLD = _value
     return True
 
-@private
-def is_contract(_address: address) -> bool:
-    return (_address != ZERO_ADDRESS) and (_address.codesize > 0)
 
 @public
-@constant
-def is_wrangler_active(_address: address) -> bool:
-    return self.wranglers[_address]
+def set_wrangler_status(_address: address, _is_active: bool) -> bool:
+    assert msg.sender == self.owner
+    self.wranglers[_address] = _is_active
+    return True
 
-@public
-@constant
-def current_wrangler_nonce(_addresses: address[2]) -> uint256:
-    return self.wrangler_nonces[_addresses[0]][_addresses[1]]
 
 @public
 @constant
 def can_borrow(_address: address) -> bool:
     return self.last_borrow_position_index[_address] < self.POSITION_THRESHOLD
 
+
 @public
 @constant
 def can_lend(_address: address) -> bool:
     return self.last_lend_position_index[_address] < self.POSITION_THRESHOLD
 
+
 @public
 @constant
-def kernel_hash(_addresses: address[6], _values: uint256(wei)[9],
-        _kernel_expires: timestamp) -> bytes32:
-    # return sha3(concat("a","b"))
+def filled_or_cancelled_loan_amount(_kernel_hash: bytes32) -> uint256:
+    return as_unitless_number(self.kernels_filled[_kernel_hash]) + as_unitless_number(self.kernels_filled[_kernel_hash])
+
+
+@public
+@constant
+def kernel_hash(
+        _addresses: address[6], _values: uint256(wei)[5],
+        _kernel_expires_at: timestamp, _creator_salt: bytes32,
+        _daily_interest_rate: uint256, _position_duration_in_seconds: timedelta
+        ) -> bytes32:
     return sha3(
         concat(
             convert(self, bytes32),
@@ -137,18 +145,25 @@ def kernel_hash(_addresses: address[6], _values: uint256(wei)[9],
             convert(_addresses[4], bytes32),# collateralToken
             convert(_addresses[5], bytes32),# loanToken
             convert(_values[0], bytes32),# loanAmountOffered
-            convert(_kernel_expires, bytes32),# offerExpiryTimestamp
-            convert(_values[2], bytes32),# relayerFeeLST
-            convert(_values[3], bytes32),# monitoringFeeLST
-            convert(_values[4], bytes32),# rolloverFeeLST
-            convert(_values[5], bytes32),# closureFeeLST
-            convert(_values[6], bytes32)# creatorSalt
+            convert(_values[1], bytes32),# relayerFeeLST
+            convert(_values[2], bytes32),# monitoringFeeLST
+            convert(_values[3], bytes32),# rolloverFeeLST
+            convert(_values[4], bytes32),# closureFeeLST
+            _creator_salt,# creatorSalt
+            convert(_kernel_expires_at, bytes32),# offerExpiryTimestamp
+            convert(_daily_interest_rate, bytes32),# loanInterestRatePerDay
+            convert(_position_duration_in_seconds, bytes32)# loanDuration
         )
     )
 
 @public
 @constant
-def position_hash(_addresses: address[7], _values: uint256(wei)[13], lend_currency_owed_value: uint256(wei), _nonce: uint256,
+def position_hash(
+        _addresses: address[6],
+        # _addresses: lender, borrower, relayer, wrangler, collateralToken, loanToken
+        _values: uint256(wei)[7],
+        # _values: collateralAmount, loanAmountOffered, relayerFeeLST, monitoringFeeLST, rolloverFeeLST, closureFeeLST, loanAmountFilled
+        _lend_currency_owed_value: uint256(wei), _nonce: uint256,
         _position_expires_at: timestamp) -> bytes32:
     return sha3(
         concat(
@@ -156,26 +171,20 @@ def position_hash(_addresses: address[7], _values: uint256(wei)[13], lend_curren
             convert(_addresses[4], bytes32),# collateralToken
             convert(_addresses[5], bytes32),# loanToken
             convert(_values[0], bytes32),# collateralAmount
-            convert(_values[12], bytes32),# loanAmountBorrowed
-            convert(lend_currency_owed_value, bytes32),# loanAmountOwed
+            convert(_values[6], bytes32),# loanAmountFilled
+            convert(_lend_currency_owed_value, bytes32),# loanAmountOwed
             convert(_position_expires_at, bytes32),# loanExpiresAtTimestamp
             convert(_addresses[0], bytes32),# lender
             convert(_addresses[1], bytes32),# borrower
             convert(_addresses[2], bytes32),# relayer
             convert(_addresses[3], bytes32),# wrangler
-            convert(_values[5], bytes32),# relayerFeeLST
-            convert(_values[6], bytes32),# monitoringFeeLST
-            convert(_values[7], bytes32),# rolloverFeeLST
-            convert(_values[8], bytes32),# closureFeeLST
+            convert(_values[2], bytes32),# relayerFeeLST
+            convert(_values[3], bytes32),# monitoringFeeLST
+            convert(_values[4], bytes32),# rolloverFeeLST
+            convert(_values[5], bytes32),# closureFeeLST
             convert(_nonce, bytes32)# nonce
         )
     )
-
-
-@public
-@constant
-def filled_or_cancelled_loan_amount(_kernel_hash: bytes32) -> uint256:
-    return as_unitless_number(self.kernels_filled[_kernel_hash]) + as_unitless_number(self.kernels_filled[_kernel_hash])
 
 
 @private
@@ -204,22 +213,29 @@ def position_counts(_address: address) -> (uint256, uint256):
 
 @private
 def open_position(_kernel_creator: address,
-        _addresses: address[7], _values: uint256(wei)[13],
-        _position_duration_in_seconds: timedelta, _nonce: uint256,
-        _approval_expires: timestamp, _v: uint256, _r: uint256, _s: uint256) -> bool:
+        _addresses: address[6],
+        # _addresses: lender, borrower, relayer, wrangler, collateralToken, loanToken
+        _values: uint256(wei)[7],
+        # _values: collateralAmount, loanAmountOffered, relayerFeeLST, monitoringFeeLST, rolloverFeeLST, closureFeeLST, loanAmountFilled
+        _nonce: uint256,
+        _kernel_daily_interest_rate: uint256,
+        _position_duration_in_seconds: timedelta,
+        _approval_expires: timestamp, _sig_data: uint256[3]) -> bool:
+    # validate wrnagler's activation status
     assert self.wranglers[_addresses[3]]
     assert _approval_expires > block.timestamp
-    assert _nonce == self.current_wrangler_nonce([_addresses[3], _kernel_creator]) + 1
+    assert _nonce == self.wrangler_nonces[_addresses[3]][_kernel_creator] + 1
     self.wrangler_nonces[_addresses[3]][_kernel_creator] += 1
+
     # owed value
-    _lend_currency_borrowed_value: uint256(wei) = _values[12]
-    _daily_interest_rate: uint256 = as_unitless_number(_values[2]) / as_unitless_number(self.DECIMALS)
     _position_duration_in_days: uint256 = as_unitless_number(_position_duration_in_seconds) / as_unitless_number(self.SECONDS_PER_DAY)
-    _total_interest: uint256 = as_unitless_number(_lend_currency_borrowed_value) * _daily_interest_rate * _daily_interest_rate / 100
-    _total_owed: uint256 = as_unitless_number(_lend_currency_borrowed_value) + _total_interest
+    _total_interest: uint256 = as_unitless_number(_values[6]) * as_unitless_number(_kernel_daily_interest_rate) / 100
+    _total_owed: uint256 = as_unitless_number(_values[6]) + _total_interest
     _lend_currency_owed_value: uint256(wei) = as_wei_value(_total_owed, "wei")
     _position_expires_at: timestamp = block.timestamp + _position_duration_in_seconds
     _position_hash: bytes32 = self.position_hash(_addresses, _values, _lend_currency_owed_value, _nonce, _position_expires_at)
+    # validate wrangler's signature
+    # assert _addresses[3] == ecrecover(_position_hash, _sig_data[0], _sig_data[1], _sig_data[2])
     # record position
     # players
     self.positions[_position_hash].lender = _addresses[0]
@@ -228,38 +244,37 @@ def open_position(_kernel_creator: address,
     self.positions[_position_hash].wrangler = _addresses[3]
     # terms
     self.positions[_position_hash].created_at = block.timestamp
-    self.positions[_position_hash].expires_at = _position_expires_at
     self.positions[_position_hash].updated_at = block.timestamp
+    self.positions[_position_hash].expires_at = _position_expires_at
     self.positions[_position_hash].borrow_currency_address = _addresses[4]
     self.positions[_position_hash].lend_currency_address = _addresses[5]
     self.positions[_position_hash].borrow_currency_value = _values[0]
     self.positions[_position_hash].borrow_currency_current_value = _values[0]
-    self.positions[_position_hash].lend_currency_borrowed_value = _lend_currency_borrowed_value
+    self.positions[_position_hash].lend_currency_filled_value = _values[6]
     self.positions[_position_hash].lend_currency_owed_value = _lend_currency_owed_value
     self.positions[_position_hash].status = self.POSITION_STATUS_OPEN
     # nonce
     self.positions[_position_hash].nonce = _nonce
     # fees
-    self.positions[_position_hash].relayer_fee = _values[5]
-    self.positions[_position_hash].monitoring_fee = _values[6]
-    self.positions[_position_hash].rollover_fee = _values[7]
-    self.positions[_position_hash].closure_fee = _values[8]
+    self.positions[_position_hash].relayer_fee = _values[2]
+    self.positions[_position_hash].monitoring_fee = _values[3]
+    self.positions[_position_hash].rollover_fee = _values[4]
+    self.positions[_position_hash].closure_fee = _values[5]
     assert self.record_position(_addresses[0], _addresses[1], _position_hash)
-
     # transfer borrow_currency_current_value from borrower to this address
     assert ERC20(self.positions[_position_hash].borrow_currency_address).transferFrom(
         self.positions[_position_hash].borrower,
         self,
         as_unitless_number(self.positions[_position_hash].borrow_currency_current_value)
     )
-    # transfer lend_currency_borrowed_value from lender to borrower
+    # transfer lend_currency_filled_value from lender to borrower
     assert ERC20(self.positions[_position_hash].lend_currency_address).transferFrom(
         self.positions[_position_hash].lender,
         self.positions[_position_hash].borrower,
-        as_unitless_number(self.positions[_position_hash].lend_currency_borrowed_value)
+        as_unitless_number(self.positions[_position_hash].lend_currency_filled_value)
     )
     # transfer monitoring_fee from lender to wrangler
-    assert self.token_address.transferFrom(
+    assert ERC20(self.protocol_token_address).transferFrom(
         self.positions[_position_hash].lender,
         self.positions[_position_hash].wrangler,
         as_unitless_number(self.positions[_position_hash].monitoring_fee)
@@ -340,10 +355,22 @@ def close_position(_position_hash: bytes32) -> bool:
 
 
 @public
-def fill_kernel(_addresses: address[7], _values: uint256(wei)[13],
-        position_duration_in_seconds: timedelta, _timestamps: timestamp[2], _nonce: uint256,
-        _vS: uint256[2], _rS: uint256[2], _sS: uint256[2],
-        _is_creator_lender: bool) -> bool:
+def fill_kernel(
+        _addresses: address[6],
+        # _addresses: lender, borrower, relayer, wrangler, collateralToken, loanToken
+        _values: uint256(wei)[7],
+        # _values: collateralAmount, loanAmountOffered, relayerFeeLST, monitoringFeeLST, rolloverFeeLST, closureFeeLST, loanAmountFilled
+        _nonce: uint256,
+        _kernel_daily_interest_rate: uint256,
+        _is_creator_lender: bool,
+        _timestamps: timestamp[2],
+        # kernel_expires_at, wrangler_approval_expires_at
+        _position_duration_in_seconds: timedelta,
+        # loanDuration
+        _kernel_creator_salt: bytes32,
+        _sig_data: uint256[3][2]
+        # v, r, s of kernel_creator and wrangler
+        ) -> bool:
     # validate _lender is not empty
     assert _addresses[0] != ZERO_ADDRESS
     # validate _borrower is not empty
@@ -375,32 +402,29 @@ def fill_kernel(_addresses: address[7], _values: uint256(wei)[13],
         _addresses[4], # collateralToken
         _addresses[5]  # loanToken
     ]
-    _kernel_values: uint256(wei)[9] = [
+    _kernel_values: uint256(wei)[5] = [
         _values[1],    # loanAmountOffered
-        _values[2],    # interestRatePerDay
-        _values[3],    # loanDuration
-        _values[4],    # offerExpiryTimestamp
-        _values[5],    # relayerFeeLST
-        _values[6],    # monitoringFeeLST
-        _values[7],    # rolloverFeeLST
-        _values[8],    # closureFeeLST
-        _values[9]     # creatorSalt
+        _values[2],    # relayerFeeLST
+        _values[3],    # monitoringFeeLST
+        _values[4],    # rolloverFeeLST
+        _values[5]     # closureFeeLST
     ]
-    _k_hash: bytes32 = self.kernel_hash(_kernel_addresses, _kernel_values, _timestamps[0])
-    # require(offerCreator == ecrecover(offer.offerHash, _vS[0], _rS[0], _sS[0]));
-    assert _kernel_creator == ecrecover(_k_hash, _vS[0], _rS[0], _sS[0])
-    # validate laon amount to be filled
-    assert as_unitless_number(_values[0]) - self.filled_or_cancelled_loan_amount(_k_hash) >= as_unitless_number(_values[12])
+    _k_hash: bytes32 = self.kernel_hash(_kernel_addresses, _kernel_values, _timestamps[0], _kernel_creator_salt, _kernel_daily_interest_rate, _position_duration_in_seconds)
+    # validate kernel_creator's signature
+    # assert _kernel_creator == ecrecover(_k_hash, _sig_data[0][0], _sig_data[0][1], _sig_data[0][2])
+    # validate loan amount to be filled
+    assert as_unitless_number(_values[1]) - as_unitless_number(self.filled_or_cancelled_loan_amount(_k_hash)) >= as_unitless_number(_values[6])
     # fill offer with lending currency
-    self.kernels_filled[_k_hash] += _values[12]
-    # Transfer input to wranglerLoanRegistryContractAddress
-    assert self.is_contract(_addresses[6])
+    self.kernels_filled[_k_hash] += _values[6]
     # open position
-    assert self.open_position(_kernel_creator, _addresses, _values,
-        position_duration_in_seconds, _nonce, _timestamps[1], _vS[1], _rS[1], _sS[1])
+    assert self.open_position(
+        _kernel_creator, _addresses, _values,
+        _nonce, _kernel_daily_interest_rate,
+        _position_duration_in_seconds, _timestamps[1], _sig_data[1]
+    )
     # transfer relayerFeeLST from lender to relayer
-    if not _addresses[3] == ZERO_ADDRESS:
-        assert self.token_address.transferFrom(_addresses[0], _addresses[3], as_unitless_number(_values[5]))
+    if not _addresses[2] == ZERO_ADDRESS:
+        assert ERC20(self.protocol_token_address).transferFrom(_addresses[0], _addresses[2], as_unitless_number(_values[2]))
 
     return True
 
@@ -410,7 +434,8 @@ def cancel_kernel(_addresses: address[6], _values: uint256(wei)[9], _expires: ti
         _v: uint256, _r: uint256, _s: uint256,
         _lend_currency_cancel_value: uint256(wei)) -> bool:
     # verify sender is kernel signer
-    kernel_hash: bytes32 = self.kernel_hash(_addresses, _values, _expires)
+    # kernel_hash: bytes32 = self.kernel_hash(_addresses, _values, _expires)
+    kernel_hash: bytes32 = convert("test", bytes32)
     assert msg.sender == ecrecover(kernel_hash, _v, _r, _s)
     # verify sanity of offered and cancellation amounts
     assert as_unitless_number(_values[1]) > 0
