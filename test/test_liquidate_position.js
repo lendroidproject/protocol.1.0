@@ -1,5 +1,6 @@
 // helpers
 const mineTx = require("./helpers/mineTx.js");
+const delay = require("./helpers/delay.js");
 // contracts
 var ERC20 = artifacts.require('ERC20.vyper'),
   Protocol = artifacts.require('protocol.vyper');
@@ -23,7 +24,7 @@ contract("Protocol", function (addresses) {
     // uint256 values
     this.kernel_daily_interest_rate = 10
     // timedelta values
-    this.kernel_position_duration_in_seconds = 5000
+    this.kernel_position_duration_in_seconds = 5
     // wei values
     this.kernel_lending_currency_maximum_value = '40'
     this.kernel_relayer_fee = '10'
@@ -35,20 +36,12 @@ contract("Protocol", function (addresses) {
     // _today.setDate(_today.getDate() + 2)
     // this.kernel_expires_at = _today.getTime() / 1000
     this.kernel_expires_at = web3.eth.getBlock(web3.eth.blockNumber).timestamp + 86400*2
-    let _today = new Date()
-    _today.setDate(_today.getDate() + 2)
-    this.kernel_expires_at = _today.getTime() / 1000
     // bytes32 values
     this.kernel_creator_salt = '0x92c0b12fa215396ed0867a9a871aee1a17657643000000000000000000000000'
     // position terms
     this.position_lending_currency_fill_value = '30'
     this.position_borrow_currency_fill_value = '3'
-  });
-
-
-  it("open_position should work as expected", async function() {
-    // setup
-    // set allowance from lender to protocol contract for relayer_fee + monitoring_fee
+    // open position
     let tx = this.protocolToken.deposit({from: this.lender, value: '100'})
     await mineTx(tx);
     tx = this.protocolToken.approve(this.protocolContract.address, '100', {from: this.lender})
@@ -66,22 +59,6 @@ contract("Protocol", function (addresses) {
     // Approve wrangler as protocol owner
     tx = this.protocolContract.set_wrangler_status(this.wrangler, true, {from:addresses[0]});
     await mineTx(tx);
-    // lender check
-    let lenderPositionCounts = await this.protocolContract.position_counts(this.lender);
-    let lenderBorrowPositionsCount = lenderPositionCounts[0];
-    let lenderLendPositionsCount = lenderPositionCounts[1];
-    assert.isTrue(lenderBorrowPositionsCount.toString() === '0', "lender's borrow position count should be 0");
-    assert.isTrue(lenderLendPositionsCount.toString() === '0', "lender's lend position count should be 0");
-    assert.isTrue(await this.protocolContract.can_lend(this.lender), 'lender should be able to lend')
-    // borrower check
-    let borrowerPositionCounts = await this.protocolContract.position_counts(this.borrower);
-    let borrowerBorrowPositionsCount = borrowerPositionCounts[0];
-    let borrowerLendPositionsCount = borrowerPositionCounts[1];
-    assert.isTrue(borrowerBorrowPositionsCount.toString() === '0', "borrower's borrow position count should be 0");
-    assert.isTrue(borrowerLendPositionsCount.toString() === '0', "borrower's lend position count should be 0");
-    assert.isTrue(await this.protocolContract.can_lend(this.borrower), 'borrower should be able to lend')
-
-    // fill kernel and open position
     // Sign kernel hash as lender
     let kernel_hash = await this.protocolContract.kernel_hash(
       [
@@ -96,13 +73,10 @@ contract("Protocol", function (addresses) {
     )
     let res = web3.eth.sign(this.lender, kernel_hash)
     res = res.substr(2)
-    _r1 = `0x${res.slice(0, 64)}`
-    _s1 = `0x${res.slice(64, 128)}`
-    _v1 = `${res.slice(128, 130)}` === '00' ? 27 : 28
     // Sign position hash as wrangler
     _position_expiry_timestamp = web3.eth.getBlock(web3.eth.blockNumber).timestamp + this.kernel_position_duration_in_seconds
     // _addresses, _values, _lend_currency_owed_value, _nonce, _position_expires_at
-    let position_hash = await this.protocolContract.position_hash(
+    this.position_hash = await this.protocolContract.position_hash(
       [
         this.lender, this.borrower, this.relayer, this.wrangler, this.BorrowToken.address, this.LendToken.address
       ],
@@ -115,19 +89,9 @@ contract("Protocol", function (addresses) {
       '1',
       _position_expiry_timestamp
     )
-    let res_p = web3.eth.sign(this.wrangler, position_hash)
+    let res_p = web3.eth.sign(this.wrangler, this.position_hash)
     res_p = res_p.substr(2)
-    _r2 = `0x${res_p.slice(0, 64)}`
-    _s2 = `0x${res_p.slice(64, 128)}`
-    _v2 = `${res_p.slice(128, 130)}` === '00' ? 27 : 28
     // prepare inputs
-    let _nonce = '1';
-    let _is_creator_lender = true;
-    // test pre-call
-    let _kernel_amount_filled = await this.protocolContract.kernels_filled(kernel_hash);
-    assert.isTrue(_kernel_amount_filled.toString() === '0');
-    let _kernel_amount_cancelled = await this.protocolContract.kernels_cancelled(kernel_hash);
-    assert.isTrue(_kernel_amount_cancelled.toString() === '0');
     // do call
     tx = await this.protocolContract.fill_kernel(
       [
@@ -138,32 +102,122 @@ contract("Protocol", function (addresses) {
         this.kernel_relayer_fee, this.kernel_monitoring_fee, this.kernel_rollover_fee, this.kernel_closure_fee,
         this.position_lending_currency_fill_value
       ],
-      _nonce,
+      '1',
       this.kernel_daily_interest_rate,
-      _is_creator_lender,
+      true,
       [
         this.kernel_expires_at, _position_expiry_timestamp
       ],
       this.kernel_position_duration_in_seconds,
       this.kernel_creator_salt,
       [
-        [_v1, web3._extend.utils.toBigNumber(_r1).toNumber(), web3._extend.utils.toBigNumber(_s1).toNumber()],
-        [_v2, web3._extend.utils.toBigNumber(_r2).toNumber(), web3._extend.utils.toBigNumber(_s2).toNumber()],
+        [
+          `${res.slice(128, 130)}` === '00' ? 27 : 28,
+          web3._extend.utils.toBigNumber(`0x${res.slice(0, 64)}`).toNumber(),
+          web3._extend.utils.toBigNumber(`0x${res.slice(64, 128)}`).toNumber()
+        ],
+        [
+          `${res_p.slice(128, 130)}` === '00' ? 27 : 28,
+          web3._extend.utils.toBigNumber(`0x${res_p.slice(0, 64)}`).toNumber(),
+          web3._extend.utils.toBigNumber(`0x${res_p.slice(64, 128)}`).toNumber()
+        ],
       ],
       {from: addresses[0]}
     );
-
     await mineTx(tx);
-    // test post-call
-    lenderPositionCounts = await this.protocolContract.position_counts(this.lender);
-    lenderBorrowPositionsCount = lenderPositionCounts[0];
-    lenderLendPositionsCount = lenderPositionCounts[1];
-    assert.isTrue(lenderBorrowPositionsCount.toString() === '0', "lender's borrow position count should be 0");
-    assert.isTrue(lenderLendPositionsCount.toString() === '1', "lender's lend position count should be 1");
-    borrowerPositionCounts = await this.protocolContract.position_counts(this.borrower);
-    borrowerBorrowPositionsCount = borrowerPositionCounts[0];
-     borrowerLendPositionsCount = borrowerPositionCounts[1];
-    assert.isTrue(borrowerBorrowPositionsCount.toString() === '1', "borrower's borrow position count should be 1");
-    assert.isTrue(borrowerLendPositionsCount.toString() === '0', "borrower's lend position count should be 0");
+    this.position_index = await this.protocolContract.last_borrow_position_index(this.borrower)
+    this.position_hash = await this.protocolContract.borrow_positions(this.borrower, this.position_index)
+
+    // borrower prepares to repay
+    // set allowance from borrower to protocol contract for loan repayment
+    // tx = this.LendToken.deposit({from: this.borrower, value: '33'})
+    // await mineTx(tx);
+    // tx = this.LendToken.approve(this.protocolContract.address, '33', {from: this.borrower})
+    // await mineTx(tx);
+
+    this.position = await this.protocolContract.position(this.position_hash)
   });
+
+
+  it("liquidate_position should not work before position has expired", async function() {
+    let errr = false
+    try {
+      await this.protocolContract.liquidate_position(this.position_hash, {from:this.lender});
+    } catch (e) {
+      errr = true
+    }
+    assert.isTrue(errr, 'lender should not be able to liquidate a position before position has expired')
+    errr = false
+    try {
+      await this.protocolContract.liquidate_position(this.position_hash, {from:this.wrangler});
+    } catch (e) {
+      errr = true
+    }
+    assert.isTrue(errr, 'wrangler should not be able to liquidate a position before position has expired')
+  });
+
+
+  it("liquidate_position should be callable by lender", async function() {
+    console.log(`Position expiry timestamp: ${this.position[5].toNumber()}`)
+    while (web3.eth.getBlock(web3.eth.blockNumber).timestamp <= this.position[5].toNumber()) {
+      console.log(`Current blocktimestamp: ${web3.eth.getBlock(web3.eth.blockNumber).timestamp}. Will check after 1s ...`)
+      web3.currentProvider.send({
+       jsonrpc: "2.0",
+       method: "evm_mine",
+       id: new Date().getTime()
+      })
+      await delay(5001)
+    }
+    console.log(`Current blocktimestamp: ${web3.eth.getBlock(web3.eth.blockNumber).timestamp}`)
+    let errr = false
+    try {
+      await this.protocolContract.liquidate_position(this.position_hash, {from:this.lender});
+    } catch (e) {
+      errr = true
+    }
+    assert.isTrue(!errr, 'lender should be able to liquidate a position')
+  });
+
+  it("liquidate_position should be callable by wrangler", async function() {
+    console.log(`Position expiry timestamp: ${this.position[5].toNumber()}`)
+    while (web3.eth.getBlock(web3.eth.blockNumber).timestamp <= this.position[5].toNumber()) {
+      console.log(`Current blocktimestamp: ${web3.eth.getBlock(web3.eth.blockNumber).timestamp}. Will check after 1s ...`)
+      web3.currentProvider.send({
+       jsonrpc: "2.0",
+       method: "evm_mine",
+       id: new Date().getTime()
+      })
+      await delay(5001)
+    }
+    console.log(`Current blocktimestamp: ${web3.eth.getBlock(web3.eth.blockNumber).timestamp}`)
+    let errr = false
+    try {
+      await this.protocolContract.liquidate_position(this.position_hash, {from:this.wrangler});
+    } catch (e) {
+      errr = true
+    }
+    assert.isTrue(!errr, 'wrangler should be able to liquidate a position')
+  });
+
+  it("liquidate_position should not be callable by borrower", async function() {
+    console.log(`Position expiry timestamp: ${this.position[5].toNumber()}`)
+    while (web3.eth.getBlock(web3.eth.blockNumber).timestamp <= this.position[5].toNumber()) {
+      console.log(`Current blocktimestamp: ${web3.eth.getBlock(web3.eth.blockNumber).timestamp}. Will check after 1s ...`)
+      web3.currentProvider.send({
+       jsonrpc: "2.0",
+       method: "evm_mine",
+       id: new Date().getTime()
+      })
+      await delay(5001)
+    }
+    console.log(`Current blocktimestamp: ${web3.eth.getBlock(web3.eth.blockNumber).timestamp}`)
+    let errr = false
+    try {
+      await this.protocolContract.liquidate_position(this.position_hash, {from:this.borrower});
+    } catch (e) {
+      errr = true
+    }
+    assert.isTrue(errr, 'borrower should be able to close a position')
+  });
+
 });

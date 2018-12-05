@@ -54,10 +54,10 @@ positions: public({
     closure_fee: uint256(wei)
 }[bytes32])
 POSITION_THRESHOLD: public(uint256)
-last_borrow_position_index: uint256[address]
-last_lend_position_index: uint256[address]
-borrow_positions: bytes32[uint256][address]
-lend_positions: bytes32[uint256][address]
+last_borrow_position_index: public(uint256[address])
+last_lend_position_index: public(uint256[address])
+borrow_positions: public(bytes32[uint256][address])
+lend_positions: public(bytes32[uint256][address])
 
 # wrangler
 wranglers: public(bool[address])
@@ -127,6 +127,21 @@ def can_lend(_address: address) -> bool:
 def filled_or_cancelled_loan_amount(_kernel_hash: bytes32) -> uint256:
     return as_unitless_number(self.kernels_filled[_kernel_hash]) + as_unitless_number(self.kernels_filled[_kernel_hash])
 
+
+@public
+@constant
+def position(_position_hash: bytes32) -> (address, address, address, address,
+    timestamp, timestamp, timestamp, address, address,
+    uint256(wei), uint256(wei), uint256(wei), uint256(wei), uint256, uint256,
+    uint256(wei), uint256(wei), uint256(wei), uint256(wei)):
+    return (self.positions[_position_hash].lender, self.positions[_position_hash].borrower, self.positions[_position_hash].relayer, self.positions[_position_hash].wrangler,
+        self.positions[_position_hash].created_at, self.positions[_position_hash].expires_at, self.positions[_position_hash].updated_at,
+        self.positions[_position_hash].borrow_currency_address, self.positions[_position_hash].lend_currency_address,
+        self.positions[_position_hash].borrow_currency_value, self.positions[_position_hash].borrow_currency_current_value,
+        self.positions[_position_hash].lend_currency_filled_value, self.positions[_position_hash].lend_currency_owed_value,
+        self.positions[_position_hash].status, self.positions[_position_hash].nonce,
+        self.positions[_position_hash].relayer_fee, self.positions[_position_hash].monitoring_fee,
+        self.positions[_position_hash].rollover_fee, self.positions[_position_hash].closure_fee)
 
 @public
 @constant
@@ -316,7 +331,7 @@ def liquidate_position(_position_hash: bytes32) -> bool:
     assert self.positions[_position_hash].status == self.POSITION_STATUS_OPEN
     # transfer borrow_currency_current_value from this address to the sender
     assert ERC20(self.positions[_position_hash].borrow_currency_address).transfer(
-        self.positions[_position_hash].borrower,
+        msg.sender,
         as_unitless_number(self.positions[_position_hash].borrow_currency_current_value)
     )
     self.positions[_position_hash].status = self.POSITION_STATUS_LIQUIDATED
