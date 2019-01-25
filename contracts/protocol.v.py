@@ -61,7 +61,6 @@ contract ERC20:
 # Events of the protocol.
 PositionStatusNotification: event({_wrangler: indexed(address), _position_hash: indexed(bytes32), _notification_key: bytes[6], _notification_value: uint256})
 PositionBorrowCurrencyNotification: event({_wrangler: indexed(address), _position_hash: indexed(bytes32), _notification_key: bytes[21], _notification_value: uint256})
-# DebugEventUint256Wei: event({_description: bytes[12], _value: uint256})
 
 # Variables of the protocol.
 protocol_token_address: public(address)
@@ -245,7 +244,7 @@ def open_position(
         _position_duration_in_seconds: timedelta,
         _approval_expires: timestamp,
         _sig_data: uint256[3]
-        # v, r, s of kernel_creator and wrangler
+        # v, r, s of wrangler
     ):
     # calculate owed value
     _position_duration_in_days: uint256 = as_unitless_number(_position_duration_in_seconds) / as_unitless_number(self.SECONDS_PER_DAY)
