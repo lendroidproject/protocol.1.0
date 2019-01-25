@@ -25,7 +25,7 @@ contract("Protocol", function (addresses) {
     } catch (e) {
       errr = true
     }
-    assert.isTrue(errr, 'a non-owner should not able to set the POSITION_THRESHOLD value')
+    assert.isTrue(errr, 'a non-owner should not able to set the position_threshold value')
     errr = false
     try {
       await this.protocolContract.set_wrangler_status(this.wrangler, true, {from:addresses[0]});
@@ -56,22 +56,22 @@ contract("Protocol", function (addresses) {
     } catch (e) {
       errr = true
     }
-    assert.isTrue(errr, 'a non-owner should not able to set the POSITION_THRESHOLD value')
+    assert.isTrue(errr, 'a non-owner should not able to set the position_threshold value')
     errr = false
     try {
       await this.protocolContract.set_position_threshold(11, {from:addresses[0]});
     } catch (e) {
       errr = true
     }
-    assert.isTrue(!errr, 'owner is not not able to set the POSITION_THRESHOLD value')
+    assert.isTrue(!errr, 'owner is not not able to set the position_threshold value')
   });
 
 
   it("set_position_threshold should be changeable", async function() {
-    let currentThreshold = await this.protocolContract.POSITION_THRESHOLD();
-    assert.isTrue(currentThreshold.toString() === '10', 'POSITION_THRESHOLD does not have the default value');
+    let currentThreshold = await this.protocolContract.position_threshold();
+    assert.isTrue(currentThreshold.toString() === '10', 'position_threshold does not have the default value');
     await this.protocolContract.set_position_threshold(11, {from:addresses[0]});
-    currentThreshold = await this.protocolContract.POSITION_THRESHOLD();
-    assert.isTrue(currentThreshold.toString() === '11', 'POSITION_THRESHOLD value should have changed');
+    currentThreshold = await this.protocolContract.position_threshold();
+    assert.isTrue(currentThreshold.toString() === '11', 'position_threshold value should have changed');
   });
 });

@@ -25,36 +25,35 @@ contract("Protocol", function (addresses) {
     this.kernel_daily_interest_rate = 10
     // timedelta values
     this.kernel_position_duration_in_seconds = 5
+    this.wrangler_approval_duration_in_seconds = 5 * 60
     // wei values
-    this.kernel_lending_currency_maximum_value = '40'
-    this.kernel_relayer_fee = '10'
-    this.kernel_monitoring_fee = '10'
-    this.kernel_rollover_fee = '10'
-    this.kernel_closure_fee = '10'
+    this.kernel_lending_currency_maximum_value = web3._extend.utils.toWei('40', 'ether')
+    this.kernel_relayer_fee = web3._extend.utils.toWei('10', 'ether')
+    this.kernel_monitoring_fee = web3._extend.utils.toWei('10', 'ether')
+    this.kernel_rollover_fee = web3._extend.utils.toWei('10', 'ether')
+    this.kernel_closure_fee = web3._extend.utils.toWei('10', 'ether')
     // timestamp values
-    // let _today = new Date()
-    // _today.setDate(_today.getDate() + 2)
-    // this.kernel_expires_at = _today.getTime() / 1000
     this.kernel_expires_at = web3.eth.getBlock(web3.eth.blockNumber).timestamp + 86400*2
     // bytes32 values
     this.kernel_creator_salt = '0x92c0b12fa215396ed0867a9a871aee1a17657643000000000000000000000000'
     // position terms
-    this.position_lending_currency_fill_value = '30'
-    this.position_borrow_currency_fill_value = '3'
+    this.position_lending_currency_fill_value = web3._extend.utils.toWei('30', 'ether')
+    this.position_borrow_currency_fill_value = web3._extend.utils.toWei('3', 'ether')
+    this.position_lending_currency_owed_value = web3._extend.utils.toWei('30', 'ether')
     // open position
-    let tx = this.protocolToken.deposit({from: this.lender, value: '100'})
+    let tx = this.protocolToken.mint(this.lender, web3._extend.utils.toWei('100', 'ether'), {from: addresses[0]})
     await mineTx(tx);
-    tx = this.protocolToken.approve(this.protocolContract.address, '100', {from: this.lender})
+    tx = this.protocolToken.approve(this.protocolContract.address, web3._extend.utils.toWei('100', 'ether'), {from: this.lender})
     await mineTx(tx);
     // set allowance from lender to protocol contract for loan transfer
-    tx = this.LendToken.deposit({from: this.lender, value: '40'})
+    tx = this.LendToken.mint(this.lender, web3._extend.utils.toWei('40', 'ether'), {from: addresses[0]})
     await mineTx(tx);
-    tx = this.LendToken.approve(this.protocolContract.address, '40', {from: this.lender})
+    tx = this.LendToken.approve(this.protocolContract.address, web3._extend.utils.toWei('40', 'ether'), {from: this.lender})
     await mineTx(tx);
     // set allowance from borrower to protocol contract for collateral transfer
-    tx = this.BorrowToken.deposit({from: this.borrower, value: '5'})
+    tx = this.BorrowToken.mint(this.borrower, web3._extend.utils.toWei('5', 'ether'), {from: addresses[0]})
     await mineTx(tx);
-    tx = this.BorrowToken.approve(this.protocolContract.address, '5', {from: this.borrower})
+    tx = this.BorrowToken.approve(this.protocolContract.address, web3._extend.utils.toWei('5', 'ether'), {from: this.borrower})
     await mineTx(tx);
     // Approve wrangler as protocol owner
     tx = this.protocolContract.set_wrangler_status(this.wrangler, true, {from:addresses[0]});
@@ -71,11 +70,10 @@ contract("Protocol", function (addresses) {
       this.kernel_expires_at, this.kernel_creator_salt,
       this.kernel_daily_interest_rate, this.kernel_position_duration_in_seconds
     )
-    let res = web3.eth.sign(this.lender, kernel_hash)
-    res = res.substr(2)
+    let _kernel_creator_signature = web3.eth.sign(this.lender, kernel_hash)
+    _kernel_creator_signature = _kernel_creator_signature.substr(2)
     // Sign position hash as wrangler
-    _position_expiry_timestamp = web3.eth.getBlock(web3.eth.blockNumber).timestamp + this.kernel_position_duration_in_seconds
-    // _addresses, _values, _lend_currency_owed_value, _nonce, _position_expires_at
+    let _nonce = '1';
     this.position_hash = await this.protocolContract.position_hash(
       [
         this.lender, this.borrower, this.relayer, this.wrangler, this.BorrowToken.address, this.LendToken.address
@@ -85,13 +83,14 @@ contract("Protocol", function (addresses) {
         this.kernel_relayer_fee, this.kernel_monitoring_fee, this.kernel_rollover_fee, this.kernel_closure_fee,
         this.position_lending_currency_fill_value
       ],
-      '33',
-      '1',
-      _position_expiry_timestamp
+      this.position_lending_currency_owed_value,
+      _nonce
     )
-    let res_p = web3.eth.sign(this.wrangler, this.position_hash)
-    res_p = res_p.substr(2)
+    let _wrangler_approval_expiry_timestamp = web3.eth.getBlock(web3.eth.blockNumber).timestamp + this.wrangler_approval_duration_in_seconds
+    let _wrangler_signature = web3.eth.sign(this.wrangler, this.position_hash)
+    _wrangler_signature = _wrangler_signature.substr(2)
     // prepare inputs
+    let _is_creator_lender = true;
     // do call
     tx = await this.protocolContract.fill_kernel(
       [
@@ -102,24 +101,24 @@ contract("Protocol", function (addresses) {
         this.kernel_relayer_fee, this.kernel_monitoring_fee, this.kernel_rollover_fee, this.kernel_closure_fee,
         this.position_lending_currency_fill_value
       ],
-      '1',
+      _nonce,
       this.kernel_daily_interest_rate,
-      true,
+      _is_creator_lender,
       [
-        this.kernel_expires_at, _position_expiry_timestamp
+        this.kernel_expires_at, _wrangler_approval_expiry_timestamp
       ],
       this.kernel_position_duration_in_seconds,
       this.kernel_creator_salt,
       [
         [
-          `${res.slice(128, 130)}` === '00' ? 27 : 28,
-          web3._extend.utils.toBigNumber(`0x${res.slice(0, 64)}`).toNumber(),
-          web3._extend.utils.toBigNumber(`0x${res.slice(64, 128)}`).toNumber()
+          `${_kernel_creator_signature.slice(128, 130)}` === '00' ? web3._extend.utils.toBigNumber(27) : web3._extend.utils.toBigNumber(28),
+          web3._extend.utils.toBigNumber(`0x${_kernel_creator_signature.slice(0, 64)}`),
+          web3._extend.utils.toBigNumber(`0x${_kernel_creator_signature.slice(64, 128)}`)
         ],
         [
-          `${res_p.slice(128, 130)}` === '00' ? 27 : 28,
-          web3._extend.utils.toBigNumber(`0x${res_p.slice(0, 64)}`).toNumber(),
-          web3._extend.utils.toBigNumber(`0x${res_p.slice(64, 128)}`).toNumber()
+          `${_wrangler_signature.slice(128, 130)}` === '00' ? web3._extend.utils.toBigNumber(27) : web3._extend.utils.toBigNumber(28),
+          web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(0, 64)}`),
+          web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(64, 128)}`)
         ],
       ],
       {from: addresses[0]}
@@ -127,20 +126,18 @@ contract("Protocol", function (addresses) {
     await mineTx(tx);
     this.position_index = await this.protocolContract.last_borrow_position_index(this.borrower)
     this.position_hash = await this.protocolContract.borrow_positions(this.borrower, this.position_index)
+    this.position = await this.protocolContract.position(this.position_hash)
 
     // borrower prepares to repay
     // set allowance from borrower to protocol contract for loan repayment
-    tx = this.LendToken.deposit({from: this.borrower, value: '33'})
+    tx = this.LendToken.mint(this.borrower, web3._extend.utils.toWei('33', 'ether'), {from: addresses[0]})
     await mineTx(tx);
-    tx = this.LendToken.approve(this.protocolContract.address, '33', {from: this.borrower})
+    tx = this.LendToken.approve(this.protocolContract.address, web3._extend.utils.toWei('33', 'ether'), {from: this.borrower})
     await mineTx(tx);
-
-    this.position = await this.protocolContract.position(this.position_hash)
   });
 
 
   it("close_position should not be callable by lender", async function() {
-
     let errr = false
     try {
       await this.protocolContract.close_position(this.position_hash, {from:this.lender});
