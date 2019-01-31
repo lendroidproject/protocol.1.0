@@ -59,6 +59,7 @@ contract("Protocol", function (addresses) {
     await mineTx(tx);
     tx = this.BorrowToken.approve(this.protocolContract.address, web3._extend.utils.toWei('5', 'ether'), {from: this.borrower})
     await mineTx(tx);
+
     // Approve wrangler as protocol owner
     tx = this.protocolContract.set_wrangler_status(this.wrangler, true, {from:addresses[0]});
     await mineTx(tx);
@@ -79,7 +80,15 @@ contract("Protocol", function (addresses) {
     assert.isTrue(borrowerBorrowPositionsCount.toString() === '0', "borrower's borrow position count should be 0");
     assert.isTrue(borrowerLendPositionsCount.toString() === '0', "borrower's lend position count should be 0");
     assert.isTrue(await this.protocolContract.can_lend(this.borrower), 'borrower should be able to lend')
-
+    // balances check
+    let protocolContractBorrowTokenBalance = await this.BorrowToken.balanceOf(this.protocolContract.address);
+    assert.isTrue(protocolContractBorrowTokenBalance.toString() === '0', "protocolContract's BorrowToken balance should be 0");
+    let borrowerLendTokenBalance = await this.LendToken.balanceOf(this.borrower);
+    assert.isTrue(borrowerLendTokenBalance.toString() === '0', "borrower's LendToken balance should be 0");
+    let wranglerProtocolTokenBalance = await this.protocolToken.balanceOf(this.wrangler);
+    assert.isTrue(wranglerProtocolTokenBalance.toString() === '0', "wrangler's protocolToken balance should be 0");
+    let relayerProtocolTokenBalance = await this.protocolToken.balanceOf(this.relayer);
+    assert.isTrue(relayerProtocolTokenBalance.toString() === '0', "relayer's protocolToken balance should be 0");
     // fill kernel and open position
     // Sign kernel hash as lender
     let kernel_hash = await this.protocolContract.kernel_hash(
@@ -166,5 +175,13 @@ contract("Protocol", function (addresses) {
     borrowerLendPositionsCount = borrowerPositionCounts[1];
     assert.isTrue(borrowerBorrowPositionsCount.toString() === '1', "borrower's borrow position count should be 1");
     assert.isTrue(borrowerLendPositionsCount.toString() === '0', "borrower's lend position count should be 0");
+    protocolContractBorrowTokenBalance = await this.BorrowToken.balanceOf(this.protocolContract.address);
+    assert.isTrue(protocolContractBorrowTokenBalance.toString() === this.position_borrow_currency_fill_value, `protocolContract's BorrowToken balance should be ${this.position_borrow_currency_fill_value}`);
+    borrowerLendTokenBalance = await this.LendToken.balanceOf(this.borrower);
+    assert.isTrue(borrowerLendTokenBalance.toString() === this.position_lending_currency_fill_value, `borrower's LendToken balance should be ${this.position_lending_currency_fill_value}`);
+    wranglerProtocolTokenBalance = await this.protocolToken.balanceOf(this.wrangler);
+    assert.isTrue(wranglerProtocolTokenBalance.toString() === this.kernel_monitoring_fee, `wrangler's protocolToken balance should be ${this.kernel_monitoring_fee}`);
+    relayerProtocolTokenBalance = await this.protocolToken.balanceOf(this.relayer);
+    assert.isTrue(relayerProtocolTokenBalance.toString() === this.kernel_relayer_fee, `relayer's protocolToken balance should be ${this.kernel_relayer_fee}`);
   });
 });

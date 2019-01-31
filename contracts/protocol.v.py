@@ -67,9 +67,7 @@ protocol_token_address: public(address)
 owner: public(address)
 # kernel
 kernels_filled: public(map(bytes32, uint256))
-# kernels_filled: public(uint256[bytes32])
 kernels_cancelled: public(map(bytes32, uint256))
-# kernels_cancelled: public(uint256[bytes32])
 # all positions
 positions: public(map(bytes32, Position))
 last_position_index: public(uint256)
@@ -78,9 +76,7 @@ position_threshold: public(uint256)
 last_borrow_position_index: public(map(address, uint256))
 last_lend_position_index: public(map(address, uint256))
 borrow_positions: public(map(address, map(uint256, bytes32)))
-# borrow_positions: public(bytes32[uint256][address])
 lend_positions: public(map(address, map(uint256, bytes32)))
-# lend_positions: public(bytes32[uint256][address])
 
 # wrangler
 wranglers: public(map(address, bool))
@@ -289,23 +285,26 @@ def open_position(
     # remove assert according to https://monosnap.com/file/wLFOoqAFlpl4yf78hh53RKi2qddALM
     self.record_position(_addresses[0], _addresses[1], _new_position.hash)
     # transfer borrow_currency_current_value from borrower to this address
-    ERC20(_new_position.borrow_currency_address).transferFrom(
+    token_transfer: bool = ERC20(_new_position.borrow_currency_address).transferFrom(
         _new_position.borrower,
         self,
         _new_position.borrow_currency_current_value
     )
+    assert token_transfer
     # transfer lend_currency_filled_value from lender to borrower
-    ERC20(_new_position.lend_currency_address).transferFrom(
+    token_transfer = ERC20(_new_position.lend_currency_address).transferFrom(
         _new_position.lender,
         _new_position.borrower,
         _new_position.lend_currency_filled_value
     )
+    assert token_transfer
     # transfer monitoring_fee from lender to wrangler
-    ERC20(self.protocol_token_address).transferFrom(
+    token_transfer = ERC20(self.protocol_token_address).transferFrom(
         _new_position.lender,
         _new_position.wrangler,
         _new_position.monitoring_fee
     )
+    assert token_transfer
     # Notify wrangler that a position has been opened
     log.PositionStatusNotification(_new_position.wrangler, _new_position.hash, "status", self.POSITION_STATUS_OPEN)
 
@@ -325,11 +324,12 @@ def topup_position(_position_hash: bytes32, _borrow_currency_increment: uint256)
     # perform topup
     existing_position.borrow_currency_current_value += _borrow_currency_increment
     # transfer borrow_currency_current_value from borrower to this address
-    ERC20(existing_position.borrow_currency_address).transferFrom(
+    token_transfer: bool = ERC20(existing_position.borrow_currency_address).transferFrom(
         existing_position.borrower,
         self,
         _borrow_currency_increment
     )
+    assert token_transfer
     # Notify wrangler that a position has been topped up
     log.PositionBorrowCurrencyNotification(existing_position.wrangler, _position_hash, "borrow_currency_value", self.POSITION_TOPPED_UP)
     # unlock position_non_reentrant for topup
@@ -355,10 +355,11 @@ def liquidate_position(_position_hash: bytes32) -> bool:
     self.positions[_position_hash] = existing_position
     self.remove_position(_position_hash)
     # transfer borrow_currency_current_value from this address to the sender
-    ERC20(existing_position.borrow_currency_address).transfer(
+    token_transfer: bool = ERC20(existing_position.borrow_currency_address).transfer(
         msg.sender,
         existing_position.borrow_currency_current_value
     )
+    assert token_transfer
     # Notify wrangler that a position has been liquidated
     log.PositionStatusNotification(existing_position.wrangler, _position_hash, "status", self.POSITION_STATUS_LIQUIDATED)
     # unlock position_non_reentrant for liquidation
@@ -384,16 +385,18 @@ def close_position(_position_hash: bytes32) -> bool:
     self.positions[_position_hash] = existing_position
     self.remove_position(_position_hash)
     # transfer lend_currency_owed_value from borrower to lender
-    ERC20(existing_position.lend_currency_address).transferFrom(
+    token_transfer: bool = ERC20(existing_position.lend_currency_address).transferFrom(
         existing_position.borrower,
         existing_position.lender,
         existing_position.lend_currency_owed_value
     )
+    assert token_transfer
     # transfer borrow_currency_current_value from this address to borrower
-    ERC20(existing_position.borrow_currency_address).transfer(
+    token_transfer = ERC20(existing_position.borrow_currency_address).transfer(
         existing_position.borrower,
         existing_position.borrow_currency_current_value
     )
+    assert token_transfer
     # Notify wrangler that a position has been closed
     log.PositionStatusNotification(existing_position.wrangler, _position_hash, "status", self.POSITION_STATUS_CLOSED)
     # unlock position_non_reentrant for closure
@@ -481,12 +484,12 @@ def fill_kernel(
     )
     # transfer relayerFeeLST from lender to relayer
     if _addresses[2] != ZERO_ADDRESS:
-        ERC20(self.protocol_token_address).transferFrom(
+        token_transfer: bool = ERC20(self.protocol_token_address).transferFrom(
             _kernel_creator,
             _kernel.relayer,
             _kernel.relayer_fee
         )
-        assert True
+        assert token_transfer
 
     return True
 
@@ -523,7 +526,7 @@ def cancel_kernel(
         _kernel.relayer_fee, _kernel.monitoring_fee, _kernel.rollover_fee, _kernel.closure_fee],
         _kernel.expires_at, _kernel.salt, _kernel.daily_interest_rate, _kernel.position_duration_in_seconds)
     # verify sender is kernel signer
-    assert msg.sender == ecrecover(sha3(concat("\x19Ethereum Signed Message:\n32", _k_hash)), _sig_data[0], _sig_data[0], _sig_data[0])
+    assert msg.sender == ecrecover(sha3(concat("\x19Ethereum Signed Message:\n32", _k_hash)), _sig_data[0], _sig_data[1], _sig_data[2])
     # verify sanity of offered and cancellation amounts
     assert as_unitless_number(_kernel.lend_currency_offered_value) > 0
     assert as_unitless_number(_lend_currency_cancel_value) > 0
