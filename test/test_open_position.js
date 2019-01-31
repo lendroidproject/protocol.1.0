@@ -108,7 +108,7 @@ contract("Protocol", function (addresses) {
     let _nonce = '1';
     this.position_hash = await this.protocolContract.position_hash(
       [
-        this.lender, this.borrower, this.relayer, this.wrangler, this.BorrowToken.address, this.LendToken.address
+        this.lender, this.lender, this.borrower, this.relayer, this.wrangler, this.BorrowToken.address, this.LendToken.address
       ],
       [
         this.position_borrow_currency_fill_value, this.kernel_lending_currency_maximum_value,

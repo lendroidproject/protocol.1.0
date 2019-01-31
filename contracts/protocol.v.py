@@ -25,6 +25,7 @@ struct Kernel:
 # struct representing a position
 struct Position:
     index: uint256
+    kernel_creator: address
     lender: address
     borrower: address
     relayer: address
@@ -179,8 +180,8 @@ def kernel_hash(
 @public
 @constant
 def position_hash(
-            _addresses: address[6],
-            # _addresses: lender, borrower, relayer, wrangler, collateralToken, loanToken
+            _addresses: address[7],
+            # _addresses: kernel_creator, lender, borrower, relayer, wrangler, collateralToken, loanToken
             _values: uint256[7],
             # _values: collateralAmount, loanAmountOffered, relayerFeeLST, monitoringFeeLST, rolloverFeeLST, closureFeeLST, loanAmountFilled
             _lend_currency_owed_value: uint256, _nonce: uint256
@@ -188,15 +189,16 @@ def position_hash(
     return sha3(
         concat(
             convert(self, bytes32),
-            convert(_addresses[4], bytes32),# collateralToken
-            convert(_addresses[5], bytes32),# loanToken
+            convert(_addresses[5], bytes32),# collateralToken
+            convert(_addresses[6], bytes32),# loanToken
             convert(_values[0], bytes32),# collateralAmount
             convert(_values[6], bytes32),# loanAmountFilled
             convert(_lend_currency_owed_value, bytes32),# loanAmountOwed
-            convert(_addresses[0], bytes32),# lender
-            convert(_addresses[1], bytes32),# borrower
-            convert(_addresses[2], bytes32),# relayer
-            convert(_addresses[3], bytes32),# wrangler
+            convert(_addresses[0], bytes32),# kernel_creator
+            convert(_addresses[1], bytes32),# lender
+            convert(_addresses[2], bytes32),# borrower
+            convert(_addresses[3], bytes32),# relayer
+            convert(_addresses[4], bytes32),# wrangler
             convert(_values[2], bytes32),# relayerFeeLST
             convert(_values[3], bytes32),# monitoringFeeLST
             convert(_values[4], bytes32),# rolloverFeeLST
@@ -249,6 +251,7 @@ def open_position(
     # create position from struct
     _new_position: Position = Position({
         index: self.last_position_index,
+        kernel_creator: _kernel_creator,
         lender: _addresses[0],
         borrower: _addresses[1],
         relayer: _addresses[2],
@@ -268,7 +271,10 @@ def open_position(
         monitoring_fee: _values[3],
         rollover_fee: _values[4],
         closure_fee: _values[5],
-        hash: self.position_hash(_addresses, _values, _lend_currency_owed_value, _nonce)
+        hash: self.position_hash([_kernel_creator, _addresses[0], _addresses[1],
+            _addresses[2], _addresses[3], _addresses[4], _addresses[5]],
+            _values, _lend_currency_owed_value, _nonce
+        )
     })
     # validate wrangler's activation status
     assert self.wranglers[_new_position.wrangler]
