@@ -42,7 +42,7 @@ contract("Protocol", function (addresses) {
   });
 
 
-  it("open_position should work as expected", async function() {
+  it("fill_kernel should work as expected", async function() {
     // setup
     // set allowance from lender to protocol contract for relayer_fee + monitoring_fee
     let tx = this.protocolToken.mint(this.lender, web3._extend.utils.toWei('100', 'ether'), {from: addresses[0]})

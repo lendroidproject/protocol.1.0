@@ -67,6 +67,7 @@ PositionBorrowCurrencyNotification: event({_wrangler: indexed(address), _positio
 protocol_token_address: public(address)
 owner: public(address)
 # kernel
+kernel_per_position_nonce: public(map(bytes32, map(bytes32, uint256)))
 kernels_filled: public(map(bytes32, uint256))
 kernels_cancelled: public(map(bytes32, uint256))
 # all positions
@@ -74,10 +75,12 @@ positions: public(map(bytes32, Position))
 last_position_index: public(uint256)
 position_index: public(map(uint256, bytes32))
 position_threshold: public(uint256)
-last_borrow_position_index: public(map(address, uint256))
-last_lend_position_index: public(map(address, uint256))
 borrow_positions: public(map(address, map(uint256, bytes32)))
 lend_positions: public(map(address, map(uint256, bytes32)))
+borrow_position_index: public(map(address, map(bytes32, uint256)))
+lend_position_index: public(map(address, map(bytes32, uint256)))
+borrow_positions_count: public(map(address, uint256))
+lend_positions_count: public(map(address, uint256))
 
 # wrangler
 wranglers: public(map(address, bool))
@@ -129,13 +132,13 @@ def set_wrangler_status(_address: address, _is_active: bool) -> bool:
 @public
 @constant
 def can_borrow(_address: address) -> bool:
-    return self.last_borrow_position_index[_address] < self.position_threshold
+    return self.borrow_positions_count[_address] < self.position_threshold
 
 
 @public
 @constant
 def can_lend(_address: address) -> bool:
-    return self.last_lend_position_index[_address] < self.position_threshold
+    return self.lend_positions_count[_address] < self.position_threshold
 
 
 @public
@@ -212,22 +215,36 @@ def position_hash(
 def record_position(_lender: address, _borrower: address, _position_hash: bytes32):
     assert self.can_borrow(_borrower)
     assert self.can_lend(_lender)
-    self.borrow_positions[_borrower][self.last_borrow_position_index[_borrower] + 1] = _position_hash
-    self.last_borrow_position_index[_borrower] += 1
-    self.lend_positions[_lender][self.last_lend_position_index[_lender]+1] = _position_hash
-    self.last_lend_position_index[_lender] += 1
+    # borrow position
+    self.borrow_positions_count[_borrower] += 1
+    self.borrow_position_index[_borrower][_position_hash] = self.borrow_positions_count[_borrower]
+    self.borrow_positions[_borrower][self.borrow_positions_count[_borrower]] = _position_hash
+    # lend position
+    self.lend_positions_count[_lender] += 1
+    self.lend_position_index[_lender][_position_hash] = self.lend_positions_count[_lender]
+    self.lend_positions[_lender][self.lend_positions_count[_lender]] = _position_hash
 
 
 @private
 def remove_position(_position_hash: bytes32):
-    self.last_borrow_position_index[self.positions[_position_hash].borrower] -= 1
-    self.last_lend_position_index[self.positions[_position_hash].lender] -= 1
+    # borrow position
+    _borrower: address = self.positions[_position_hash].borrower
+    _lender: address = self.positions[_position_hash].lender
+    self.borrow_positions[_borrower][self.borrow_position_index[_borrower][_position_hash]] = self.borrow_positions[_borrower][self.borrow_positions_count[_borrower]]
+    self.borrow_positions[_borrower][self.borrow_positions_count[_borrower]] = EMPTY_BYTES32
+    self.borrow_position_index[_borrower][_position_hash] = 0
+    self.borrow_positions_count[_borrower] -= 1
+    # lend position
+    self.lend_positions[_lender][self.lend_position_index[_lender][_position_hash]] = self.lend_positions[_lender][self.lend_positions_count[_lender]]
+    self.lend_positions[_lender][self.lend_positions_count[_lender]] = EMPTY_BYTES32
+    self.lend_position_index[_lender][_position_hash] = 0
+    self.lend_positions_count[_lender] -= 1
 
 
 @public
 @constant
 def position_counts(_address: address) -> (uint256, uint256):
-    return (self.last_borrow_position_index[_address], self.last_lend_position_index[_address])
+    return (self.borrow_positions_count[_address], self.lend_positions_count[_address])
 
 
 @private
@@ -236,7 +253,7 @@ def open_position(
         _addresses: address[6],
         # _addresses: lender, borrower, relayer, wrangler, collateralToken, loanToken
         _values: uint256[7],
-        # _values: collateralAmount, loanAmountOffered, relayerFeeLST, monitoringFeeLST, rolloverFeeLST, closureFeeLST, loanAmountFilled
+        # _values: collateralAmount, loanAmountOffered, relayerFeeLST, monitoringFeeLST, rolloverFeeLST, closureFeeLST, loanAmountFilled (aka, loanAmountBorrowed)
         _nonce: uint256,
         _kernel_daily_interest_rate: uint256,
         _position_duration_in_seconds: timedelta,
@@ -246,7 +263,7 @@ def open_position(
     ):
     # calculate owed value
     _position_duration_in_days: uint256 = as_unitless_number(_position_duration_in_seconds) / as_unitless_number(self.SECONDS_PER_DAY)
-    _total_interest: uint256 = as_unitless_number(_position_duration_in_days) * as_unitless_number(_kernel_daily_interest_rate) / 100
+    _total_interest: uint256 = as_unitless_number(_values[6]) * as_unitless_number(_position_duration_in_days) * as_unitless_number(_kernel_daily_interest_rate) / 100
     _lend_currency_owed_value: uint256 = as_unitless_number(_values[6]) + _total_interest
     # create position from struct
     _new_position: Position = Position({
@@ -285,8 +302,8 @@ def open_position(
     # validate wrangler's signature
     assert _new_position.wrangler == ecrecover(sha3(concat("\x19Ethereum Signed Message:\n32", _new_position.hash)), _sig_data[0], _sig_data[1], _sig_data[2])
     # update position index and record position
-    self.last_position_index += 1
     self.position_index[self.last_position_index] = _new_position.hash
+    self.last_position_index += 1
     self.positions[_new_position.hash] = _new_position
     # remove assert according to https://monosnap.com/file/wLFOoqAFlpl4yf78hh53RKi2qddALM
     self.record_position(_addresses[0], _addresses[1], _new_position.hash)

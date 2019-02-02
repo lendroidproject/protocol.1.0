@@ -124,7 +124,7 @@ contract("Protocol", function (addresses) {
       {from: addresses[0]}
     );
     await mineTx(tx);
-    this.position_index = await this.protocolContract.last_borrow_position_index(this.borrower)
+    this.position_index = await this.protocolContract.borrow_positions_count(this.borrower)
     this.position_hash = await this.protocolContract.borrow_positions(this.borrower, this.position_index)
     this.position = await this.protocolContract.position(this.position_hash)
   });
@@ -149,8 +149,8 @@ contract("Protocol", function (addresses) {
 
 
   it("liquidate_position should be callable by lender", async function() {
-    console.log(`Position expiry timestamp: ${this.position[5].toNumber()}`)
-    while (web3.eth.getBlock(web3.eth.blockNumber).timestamp <= this.position[5].toNumber()) {
+    console.log(`Position expiry timestamp: ${this.position[6].toNumber()}`)
+    while (web3.eth.getBlock(web3.eth.blockNumber).timestamp <= this.position[6].toNumber()) {
       console.log(`Current blocktimestamp: ${web3.eth.getBlock(web3.eth.blockNumber).timestamp}. Will check after 1s ...`)
       web3.currentProvider.send({
        jsonrpc: "2.0",
@@ -170,8 +170,8 @@ contract("Protocol", function (addresses) {
   });
 
   it("liquidate_position should be callable by wrangler", async function() {
-    console.log(`Position expiry timestamp: ${this.position[5].toNumber()}`)
-    while (web3.eth.getBlock(web3.eth.blockNumber).timestamp <= this.position[5].toNumber()) {
+    console.log(`Position expiry timestamp: ${this.position[6].toNumber()}`)
+    while (web3.eth.getBlock(web3.eth.blockNumber).timestamp <= this.position[6].toNumber()) {
       console.log(`Current blocktimestamp: ${web3.eth.getBlock(web3.eth.blockNumber).timestamp}. Will check after 1s ...`)
       web3.currentProvider.send({
        jsonrpc: "2.0",
@@ -191,8 +191,8 @@ contract("Protocol", function (addresses) {
   });
 
   it("liquidate_position should not be callable by borrower", async function() {
-    console.log(`Position expiry timestamp: ${this.position[5].toNumber()}`)
-    while (web3.eth.getBlock(web3.eth.blockNumber).timestamp <= this.position[5].toNumber()) {
+    console.log(`Position expiry timestamp: ${this.position[6].toNumber()}`)
+    while (web3.eth.getBlock(web3.eth.blockNumber).timestamp <= this.position[6].toNumber()) {
       console.log(`Current blocktimestamp: ${web3.eth.getBlock(web3.eth.blockNumber).timestamp}. Will check after 1s ...`)
       web3.currentProvider.send({
        jsonrpc: "2.0",
