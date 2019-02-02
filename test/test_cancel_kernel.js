@@ -87,7 +87,6 @@ contract("Protocol", function (addresses) {
     ]
   });
 
-
   it("cancel_kernel should be callable only by creator", async function() {
     let _lend_currency_cancel_value = web3._extend.utils.toWei('40', 'ether')
     let errr = false
@@ -144,7 +143,7 @@ contract("Protocol", function (addresses) {
     assert.isTrue(!errr, 'lender should be able to cancel kernel')
   });
 
-  it("cancel_kernel should not work if cancel value is above the maximum value", async function() {
+  it("cancel_kernel should not work if cancel value exceeds the maximum value", async function() {
     let _lend_currency_cancel_value = web3._extend.utils.toWei('41', 'ether')
     let errr = false
     try {
@@ -159,6 +158,207 @@ contract("Protocol", function (addresses) {
       errr = true
     }
     assert.isTrue(errr, 'borrower should not be able to cancel kernel')
+  });
+
+  it("cancel_kernel should work if cancel value is equal to maximum value - filled value", async function() {
+    // Sign position hash as wrangler
+    let _nonce = '1';
+    this.position_hash = await this.protocolContract.position_hash(
+      [
+        this.lender, this.lender, this.borrower, this.relayer, this.wrangler, this.BorrowToken.address, this.LendToken.address
+      ],
+      [
+        this.position_borrow_currency_fill_value, this.kernel_lending_currency_maximum_value,
+        this.kernel_relayer_fee, this.kernel_monitoring_fee, this.kernel_rollover_fee, this.kernel_closure_fee,
+        this.position_lending_currency_fill_value
+      ],
+      this.position_lending_currency_owed_value,
+      _nonce
+    )
+    let _wrangler_approval_expiry_timestamp = web3.eth.getBlock(web3.eth.blockNumber).timestamp + this.wrangler_approval_duration_in_seconds
+    let _wrangler_signature = web3.eth.sign(this.wrangler, this.position_hash)
+    _wrangler_signature = _wrangler_signature.substr(2)
+    let vrsWrangler = [
+      `${_wrangler_signature.slice(128, 130)}` === '00' ? web3._extend.utils.toBigNumber(27) : web3._extend.utils.toBigNumber(28),
+      web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(0, 64)}`),
+      web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(64, 128)}`)
+    ]
+    // prepare inputs
+    let _is_creator_lender = true;
+    // do call
+    tx = await this.protocolContract.fill_kernel(
+      [
+        this.lender, this.borrower, this.relayer, this.wrangler, this.BorrowToken.address, this.LendToken.address
+      ],
+      [
+        this.position_borrow_currency_fill_value, this.kernel_lending_currency_maximum_value,
+        this.kernel_relayer_fee, this.kernel_monitoring_fee, this.kernel_rollover_fee, this.kernel_closure_fee,
+        this.position_lending_currency_fill_value
+      ],
+      _nonce,
+      this.kernel_daily_interest_rate,
+      _is_creator_lender,
+      [
+        this.kernel_expires_at, _wrangler_approval_expiry_timestamp
+      ],
+      this.kernel_position_duration_in_seconds,
+      this.kernel_creator_salt,
+      [
+        this.vrsCreator,
+        vrsWrangler,
+      ],
+      {from: addresses[0]}
+    );
+    await mineTx(tx);
+
+    let _lend_currency_cancel_value = web3._extend.utils.toWei('10', 'ether')
+    let errr = false
+    try {
+      await this.protocolContract.cancel_kernel(
+        this.kernel_addresses, this.kernel_values,
+        this.kernel_expires_at, this.kernel_creator_salt, this.kernel_daily_interest_rate, this.kernel_position_duration_in_seconds,
+        this.vrsCreator,
+        _lend_currency_cancel_value,
+        {from: this.lender}
+      );
+    } catch (e) {
+      errr = true
+    }
+    assert.isTrue(!errr, 'kernel creator should be able to cancel kernel')
+  });
+
+  it("cancel_kernel should not work if cancel value is greater than maximum value - filled value", async function() {
+    // Sign position hash as wrangler
+    let _nonce = '1';
+    this.position_hash = await this.protocolContract.position_hash(
+      [
+        this.lender, this.lender, this.borrower, this.relayer, this.wrangler, this.BorrowToken.address, this.LendToken.address
+      ],
+      [
+        this.position_borrow_currency_fill_value, this.kernel_lending_currency_maximum_value,
+        this.kernel_relayer_fee, this.kernel_monitoring_fee, this.kernel_rollover_fee, this.kernel_closure_fee,
+        this.position_lending_currency_fill_value
+      ],
+      this.position_lending_currency_owed_value,
+      _nonce
+    )
+    let _wrangler_approval_expiry_timestamp = web3.eth.getBlock(web3.eth.blockNumber).timestamp + this.wrangler_approval_duration_in_seconds
+    let _wrangler_signature = web3.eth.sign(this.wrangler, this.position_hash)
+    _wrangler_signature = _wrangler_signature.substr(2)
+    let vrsWrangler = [
+      `${_wrangler_signature.slice(128, 130)}` === '00' ? web3._extend.utils.toBigNumber(27) : web3._extend.utils.toBigNumber(28),
+      web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(0, 64)}`),
+      web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(64, 128)}`)
+    ]
+    // prepare inputs
+    let _is_creator_lender = true;
+    // do call
+    tx = await this.protocolContract.fill_kernel(
+      [
+        this.lender, this.borrower, this.relayer, this.wrangler, this.BorrowToken.address, this.LendToken.address
+      ],
+      [
+        this.position_borrow_currency_fill_value, this.kernel_lending_currency_maximum_value,
+        this.kernel_relayer_fee, this.kernel_monitoring_fee, this.kernel_rollover_fee, this.kernel_closure_fee,
+        this.position_lending_currency_fill_value
+      ],
+      _nonce,
+      this.kernel_daily_interest_rate,
+      _is_creator_lender,
+      [
+        this.kernel_expires_at, _wrangler_approval_expiry_timestamp
+      ],
+      this.kernel_position_duration_in_seconds,
+      this.kernel_creator_salt,
+      [
+        this.vrsCreator,
+        vrsWrangler,
+      ],
+      {from: addresses[0]}
+    );
+    await mineTx(tx);
+
+    let _lend_currency_cancel_value = web3._extend.utils.toWei('11', 'ether')
+    let errr = false
+    try {
+      await this.protocolContract.cancel_kernel(
+        this.kernel_addresses, this.kernel_values,
+        this.kernel_expires_at, this.kernel_creator_salt, this.kernel_daily_interest_rate, this.kernel_position_duration_in_seconds,
+        this.vrsCreator,
+        _lend_currency_cancel_value,
+        {from: this.lender}
+      );
+    } catch (e) {
+      errr = true
+    }
+    assert.isTrue(errr, 'kernel creator should not be able to cancel kernel')
+  });
+
+  it("cancel_kernel should work if cancel value is less than maximum value - filled value", async function() {
+    // Sign position hash as wrangler
+    let _nonce = '1';
+    this.position_hash = await this.protocolContract.position_hash(
+      [
+        this.lender, this.lender, this.borrower, this.relayer, this.wrangler, this.BorrowToken.address, this.LendToken.address
+      ],
+      [
+        this.position_borrow_currency_fill_value, this.kernel_lending_currency_maximum_value,
+        this.kernel_relayer_fee, this.kernel_monitoring_fee, this.kernel_rollover_fee, this.kernel_closure_fee,
+        this.position_lending_currency_fill_value
+      ],
+      this.position_lending_currency_owed_value,
+      _nonce
+    )
+    let _wrangler_approval_expiry_timestamp = web3.eth.getBlock(web3.eth.blockNumber).timestamp + this.wrangler_approval_duration_in_seconds
+    let _wrangler_signature = web3.eth.sign(this.wrangler, this.position_hash)
+    _wrangler_signature = _wrangler_signature.substr(2)
+    let vrsWrangler = [
+      `${_wrangler_signature.slice(128, 130)}` === '00' ? web3._extend.utils.toBigNumber(27) : web3._extend.utils.toBigNumber(28),
+      web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(0, 64)}`),
+      web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(64, 128)}`)
+    ]
+    // prepare inputs
+    let _is_creator_lender = true;
+    // do call
+    tx = await this.protocolContract.fill_kernel(
+      [
+        this.lender, this.borrower, this.relayer, this.wrangler, this.BorrowToken.address, this.LendToken.address
+      ],
+      [
+        this.position_borrow_currency_fill_value, this.kernel_lending_currency_maximum_value,
+        this.kernel_relayer_fee, this.kernel_monitoring_fee, this.kernel_rollover_fee, this.kernel_closure_fee,
+        this.position_lending_currency_fill_value
+      ],
+      _nonce,
+      this.kernel_daily_interest_rate,
+      _is_creator_lender,
+      [
+        this.kernel_expires_at, _wrangler_approval_expiry_timestamp
+      ],
+      this.kernel_position_duration_in_seconds,
+      this.kernel_creator_salt,
+      [
+        this.vrsCreator,
+        vrsWrangler,
+      ],
+      {from: addresses[0]}
+    );
+    await mineTx(tx);
+
+    let _lend_currency_cancel_value = web3._extend.utils.toWei('9', 'ether')
+    let errr = false
+    try {
+      await this.protocolContract.cancel_kernel(
+        this.kernel_addresses, this.kernel_values,
+        this.kernel_expires_at, this.kernel_creator_salt, this.kernel_daily_interest_rate, this.kernel_position_duration_in_seconds,
+        this.vrsCreator,
+        _lend_currency_cancel_value,
+        {from: this.lender}
+      );
+    } catch (e) {
+      errr = true
+    }
+    assert.isTrue(!errr, 'kernel creator should be able to cancel kernel')
   });
 
 });
