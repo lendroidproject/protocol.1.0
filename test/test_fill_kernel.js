@@ -1,5 +1,6 @@
 // helpers
 const mineTx = require("./helpers/mineTx.js");
+const saltGenerator = require("./helpers/saltGenerator.js");
 // contracts
 var ERC20 = artifacts.require('ERC20.vyper'),
   Protocol = artifacts.require('protocol.vyper');
@@ -34,7 +35,7 @@ contract("Protocol", function (addresses) {
     // timestamp values
     this.kernel_expires_at = web3.eth.getBlock(web3.eth.blockNumber).timestamp + 86400*2
     // bytes32 values
-    this.kernel_creator_salt = '0x92c0b12fa215396ed0867a9a871aee1a17657643000000000000000000000000'
+    this.kernel_creator_salt = `0x${saltGenerator()}`
     // position terms
     this.position_lending_currency_fill_value = web3._extend.utils.toWei('30', 'ether')
     this.position_borrow_currency_fill_value = web3._extend.utils.toWei('3', 'ether')

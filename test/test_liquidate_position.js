@@ -1,6 +1,7 @@
 // helpers
 const mineTx = require("./helpers/mineTx.js");
 const delay = require("./helpers/delay.js");
+const saltGenerator = require("./helpers/saltGenerator.js");
 // contracts
 var ERC20 = artifacts.require('ERC20.vyper'),
   Protocol = artifacts.require('protocol.vyper');
@@ -35,7 +36,7 @@ contract("Protocol", function (addresses) {
     // timestamp values
     this.kernel_expires_at = web3.eth.getBlock(web3.eth.blockNumber).timestamp + 86400*2
     // bytes32 values
-    this.kernel_creator_salt = '0x92c0b12fa215396ed0867a9a871aee1a17657643000000000000000000000000'
+    this.kernel_creator_salt = `0x${saltGenerator()}`
     // position terms
     this.position_lending_currency_fill_value = web3._extend.utils.toWei('30', 'ether')
     this.position_borrow_currency_fill_value = web3._extend.utils.toWei('3', 'ether')
@@ -149,8 +150,8 @@ contract("Protocol", function (addresses) {
 
 
   it("liquidate_position should be callable by lender", async function() {
-    console.log(`Position expiry timestamp: ${this.position[6].toNumber()}`)
-    while (web3.eth.getBlock(web3.eth.blockNumber).timestamp <= this.position[6].toNumber()) {
+    console.log(`Position expiry timestamp: ${this.position[8].toNumber()}`)
+    while (web3.eth.getBlock(web3.eth.blockNumber).timestamp <= this.position[8].toNumber()) {
       console.log(`Current blocktimestamp: ${web3.eth.getBlock(web3.eth.blockNumber).timestamp}. Will check after 1s ...`)
       web3.currentProvider.send({
        jsonrpc: "2.0",
@@ -170,8 +171,8 @@ contract("Protocol", function (addresses) {
   });
 
   it("liquidate_position should be callable by wrangler", async function() {
-    console.log(`Position expiry timestamp: ${this.position[6].toNumber()}`)
-    while (web3.eth.getBlock(web3.eth.blockNumber).timestamp <= this.position[6].toNumber()) {
+    console.log(`Position expiry timestamp: ${this.position[8].toNumber()}`)
+    while (web3.eth.getBlock(web3.eth.blockNumber).timestamp <= this.position[8].toNumber()) {
       console.log(`Current blocktimestamp: ${web3.eth.getBlock(web3.eth.blockNumber).timestamp}. Will check after 1s ...`)
       web3.currentProvider.send({
        jsonrpc: "2.0",
@@ -191,8 +192,8 @@ contract("Protocol", function (addresses) {
   });
 
   it("liquidate_position should not be callable by borrower", async function() {
-    console.log(`Position expiry timestamp: ${this.position[6].toNumber()}`)
-    while (web3.eth.getBlock(web3.eth.blockNumber).timestamp <= this.position[6].toNumber()) {
+    console.log(`Position expiry timestamp: ${this.position[8].toNumber()}`)
+    while (web3.eth.getBlock(web3.eth.blockNumber).timestamp <= this.position[8].toNumber()) {
       console.log(`Current blocktimestamp: ${web3.eth.getBlock(web3.eth.blockNumber).timestamp}. Will check after 1s ...`)
       web3.currentProvider.send({
        jsonrpc: "2.0",

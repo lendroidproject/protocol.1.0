@@ -160,7 +160,7 @@ contract("Protocol", function (addresses) {
     assert.isTrue(errr, 'borrower should not be able to cancel kernel')
   });
 
-  it("cancel_kernel should work if cancel value is equal to maximum value - filled value", async function() {
+  it("cancel_kernel should work if cancel value = maximum value - filled value", async function() {
     // Sign position hash as wrangler
     let _nonce = '1';
     this.position_hash = await this.protocolContract.position_hash(
@@ -227,7 +227,7 @@ contract("Protocol", function (addresses) {
     assert.isTrue(!errr, 'kernel creator should be able to cancel kernel')
   });
 
-  it("cancel_kernel should not work if cancel value is greater than maximum value - filled value", async function() {
+  it("cancel_kernel should not work if cancel_value > maximum value - filled value", async function() {
     // Sign position hash as wrangler
     let _nonce = '1';
     this.position_hash = await this.protocolContract.position_hash(
@@ -294,7 +294,7 @@ contract("Protocol", function (addresses) {
     assert.isTrue(errr, 'kernel creator should not be able to cancel kernel')
   });
 
-  it("cancel_kernel should work if cancel value is less than maximum value - filled value", async function() {
+  it("cancel_kernel should work if cancel_value < maximum value - filled value", async function() {
     // Sign position hash as wrangler
     let _nonce = '1';
     this.position_hash = await this.protocolContract.position_hash(

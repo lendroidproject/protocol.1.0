@@ -1,6 +1,7 @@
 // helpers
 const mineTx = require("./helpers/mineTx.js");
 const delay = require("./helpers/delay.js");
+const saltGenerator = require("./helpers/saltGenerator.js");
 // contracts
 var ERC20 = artifacts.require('ERC20.vyper'),
   Protocol = artifacts.require('protocol.vyper');
@@ -35,7 +36,7 @@ contract("Protocol", function (addresses) {
     // timestamp values
     this.kernel_expires_at = web3.eth.getBlock(web3.eth.blockNumber).timestamp + 86400*2
     // bytes32 values
-    this.kernel_creator_salt = '0x92c0b12fa215396ed0867a9a871aee1a17657643000000000000000000000000'
+    this.kernel_creator_salt = `0x${saltGenerator()}`
     // position terms
     this.position_lending_currency_fill_value = web3._extend.utils.toWei('30', 'ether')
     this.position_borrow_currency_fill_value = web3._extend.utils.toWei('3', 'ether')
@@ -130,9 +131,9 @@ contract("Protocol", function (addresses) {
 
     // borrower prepares to repay
     // set allowance from borrower to protocol contract for loan repayment
-    tx = this.LendToken.mint(this.borrower, web3._extend.utils.toWei('33', 'ether'), {from: addresses[0]})
+    tx = this.LendToken.mint(this.borrower, web3._extend.utils.toWei('30', 'ether'), {from: addresses[0]})
     await mineTx(tx);
-    tx = this.LendToken.approve(this.protocolContract.address, web3._extend.utils.toWei('33', 'ether'), {from: this.borrower})
+    tx = this.LendToken.approve(this.protocolContract.address, web3._extend.utils.toWei('30', 'ether'), {from: this.borrower})
     await mineTx(tx);
   });
 
@@ -148,7 +149,6 @@ contract("Protocol", function (addresses) {
   });
 
   it("close_position should not be callable by wrangler", async function() {
-
     let errr = false
     try {
       await this.protocolContract.close_position(this.position_hash, {from:this.wrangler});
@@ -158,27 +158,28 @@ contract("Protocol", function (addresses) {
     assert.isTrue(errr, 'wrangler should not be able to close a position')
   });
 
-  it("close_position should be callable by borrower", async function() {
-
-    let errr = false
-    try {
-      await this.protocolContract.close_position(this.position_hash, {from:this.borrower});
-    } catch (e) {
-      errr = true
+  it("close_position should be callable by borrower before position has expired", async function() {
+    if (!(web3.eth.getBlock(web3.eth.blockNumber).timestamp > this.position[8].toNumber())) {
+      let errr = false
+      try {
+        await this.protocolContract.close_position(this.position_hash, {from:this.borrower});
+      } catch (e) {
+        errr = true
+      }
+      assert.isTrue(!errr, 'borrower should be able to close a position')
     }
-    assert.isTrue(!errr, 'borrower should be able to close a position')
   });
 
-  it("close_position should not work after position has expired", async function() {
-    console.log(`Position expiry timestamp: ${this.position[6].toNumber()}`)
-    while (web3.eth.getBlock(web3.eth.blockNumber).timestamp <= this.position[6].toNumber()) {
+  it("close_position should not be callable by borrower after position has expired", async function() {
+    console.log(`Position expiry timestamp: ${this.position[8].toNumber()}`)
+    while (!(web3.eth.getBlock(web3.eth.blockNumber).timestamp > this.position[8].toNumber())) {
       console.log(`Current blocktimestamp: ${web3.eth.getBlock(web3.eth.blockNumber).timestamp}. Will check after 1s ...`)
       web3.currentProvider.send({
        jsonrpc: "2.0",
        method: "evm_mine",
        id: new Date().getTime()
       })
-      await delay(5001)
+      await delay(1000)
     }
     console.log(`Current blocktimestamp: ${web3.eth.getBlock(web3.eth.blockNumber).timestamp}`)
     let errr = false
@@ -189,4 +190,5 @@ contract("Protocol", function (addresses) {
     }
     assert.isTrue(errr, 'borrower should not be able to close a position after position has expired')
   });
+
 });

@@ -31,8 +31,8 @@ struct Position:
     relayer: address
     wrangler: address
     created_at: timestamp
-    expires_at: timestamp
     updated_at: timestamp
+    expires_at: timestamp
     borrow_currency_address: address
     lend_currency_address: address
     borrow_currency_value: uint256
@@ -77,8 +77,8 @@ position_index: public(map(uint256, bytes32))
 position_threshold: public(uint256)
 borrow_positions: public(map(address, map(uint256, bytes32)))
 lend_positions: public(map(address, map(uint256, bytes32)))
-borrow_position_index: public(map(address, map(bytes32, uint256)))
-lend_position_index: public(map(address, map(bytes32, uint256)))
+borrow_position_index: map(address, map(bytes32, uint256))
+lend_position_index: map(address, map(bytes32, uint256))
 borrow_positions_count: public(map(address, uint256))
 lend_positions_count: public(map(address, uint256))
 
@@ -305,7 +305,6 @@ def open_position(
     self.position_index[self.last_position_index] = _new_position.hash
     self.last_position_index += 1
     self.positions[_new_position.hash] = _new_position
-    # remove assert according to https://monosnap.com/file/wLFOoqAFlpl4yf78hh53RKi2qddALM
     self.record_position(_addresses[0], _addresses[1], _new_position.hash)
     # transfer borrow_currency_current_value from borrower to this address
     token_transfer: bool = ERC20(_new_position.borrow_currency_address).transferFrom(
@@ -394,7 +393,7 @@ def liquidate_position(_position_hash: bytes32) -> bool:
 @public
 def close_position(_position_hash: bytes32) -> bool:
     existing_position: Position = self.positions[_position_hash]
-    # confirm sender is borrower
+    # # confirm sender is borrower
     assert msg.sender == existing_position.borrower
     # confirm position has not expired yet
     assert existing_position.expires_at >= block.timestamp
