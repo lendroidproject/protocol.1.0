@@ -362,6 +362,7 @@ def topup_position(_position_hash: bytes32, _borrow_currency_increment: uint256)
     self.position_locks[method_id('topup_position()', bytes32)][_position_hash] = True
     # perform topup
     existing_position.borrow_currency_current_value += _borrow_currency_increment
+    self.positions[_position_hash] = existing_position
     # transfer borrow_currency_current_value from borrower to this address
     token_transfer: bool = ERC20(existing_position.borrow_currency_address).transferFrom(
         existing_position.borrower,
