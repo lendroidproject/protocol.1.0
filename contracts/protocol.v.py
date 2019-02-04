@@ -86,6 +86,9 @@ lend_positions_count: public(map(address, uint256))
 wranglers: public(map(address, bool))
 wrangler_nonces: public(map(address, map(address, uint256)))
 
+# tokens
+supported_tokens: public(map(address, bool))
+
 # nonreentrant locks for positions, inspired from https://github.com/ethereum/vyper/issues/1204
 position_locks: map(bytes32, map(bytes32, bool))
 
@@ -127,6 +130,20 @@ def set_wrangler_status(_address: address, _is_active: bool) -> bool:
     assert msg.sender == self.owner
     self.wranglers[_address] = _is_active
     return True
+
+
+@public
+def set_token_support(_address: address, _is_active: bool) -> bool:
+    assert msg.sender == self.owner
+    assert self.is_contract(_address)
+    self.supported_tokens[_address] = _is_active
+    return True
+
+
+@public
+@constant
+def is_token_active(_address: address) -> bool:
+    return self.is_contract(_address) and self.supported_tokens[_address]
 
 
 @public
@@ -474,9 +491,9 @@ def fill_kernel(
     # validate _wrangler is not empty
     assert _kernel.wrangler != ZERO_ADDRESS
     # validate _collateralToken is a contract address
-    assert self.is_contract(_kernel.borrow_currency_address)
+    assert self.is_token_active(_kernel.borrow_currency_address)
     # validate _loanToken is a contract address
-    assert self.is_contract(_kernel.lend_currency_address)
+    assert self.is_token_active(_kernel.lend_currency_address)
     # validate loan amounts
     assert as_unitless_number(_values[0]) > 0
     assert as_unitless_number(_kernel.lend_currency_offered_value) > 0

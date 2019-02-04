@@ -16,6 +16,10 @@ contract("Protocol", function (addresses) {
     this.LendToken = await ERC20.new("Test Lend Token", "TLT", 18, 1000000000);
     this.BorrowToken = await ERC20.new("Test Borrow Token", "TBT", 18, 1000000000);
     this.protocolContract = await Protocol.new(this.protocolToken.address);
+    let tx = await this.protocolContract.set_token_support(this.LendToken.address, true, {from:addresses[0]});
+    await mineTx(tx);
+    tx = await this.protocolContract.set_token_support(this.BorrowToken.address, true, {from:addresses[0]});
+    await mineTx(tx);
     this.lender = addresses[1];
     this.borrower = addresses[2];
     this.relayer = addresses[3];
@@ -46,7 +50,7 @@ contract("Protocol", function (addresses) {
   it("fill_kernel should work as expected", async function() {
     // setup
     // set allowance from lender to protocol contract for relayer_fee + monitoring_fee
-    let tx = this.protocolToken.mint(this.lender, web3._extend.utils.toWei('100', 'ether'), {from: addresses[0]})
+    tx = this.protocolToken.mint(this.lender, web3._extend.utils.toWei('100', 'ether'), {from: addresses[0]})
     await mineTx(tx);
     tx = this.protocolToken.approve(this.protocolContract.address, web3._extend.utils.toWei('100', 'ether'), {from: this.lender})
     await mineTx(tx);
