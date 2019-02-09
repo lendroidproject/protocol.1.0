@@ -114,35 +114,11 @@ def __init__(_protocol_token_address: address):
     self.POSITION_TOPPED_UP = 1
 
 
+# constant functions
 @private
 @constant
 def is_contract(_address: address) -> bool:
     return (_address != ZERO_ADDRESS) and (_address.codesize > 0)
-
-
-@public
-def set_position_threshold(_value: uint256) -> bool:
-    assert msg.sender == self.owner
-    self.position_threshold = _value
-    log.ProtocolParameterPositionThresholdNotification(msg.sender, _value)
-    return True
-
-
-@public
-def set_wrangler_status(_address: address, _is_active: bool) -> bool:
-    assert msg.sender == self.owner
-    self.wranglers[_address] = _is_active
-    log.ProtocolParameterWranglerStatusNotification(_address, _is_active)
-    return True
-
-
-@public
-def set_token_support(_address: address, _is_active: bool) -> bool:
-    assert msg.sender == self.owner
-    assert self.is_contract(_address)
-    self.supported_tokens[_address] = _is_active
-    log.ProtocolParameterTokenSupportNotification(_address, _is_active)
-    return True
 
 
 @public
@@ -173,6 +149,13 @@ def filled_or_cancelled_loan_amount(_kernel_hash: bytes32) -> uint256:
 @constant
 def position(_position_hash: bytes32) -> Position:
     return self.positions[_position_hash]
+
+
+@public
+@constant
+def position_counts(_address: address) -> (uint256, uint256):
+    return (self.borrow_positions_count[_address], self.lend_positions_count[_address])
+
 
 @public
 @constant
@@ -233,6 +216,46 @@ def position_hash(
     )
 
 
+# escape hatch functions
+@public
+def escape_hatch_token(_token_address: address) -> bool:
+    assert msg.sender == self.owner
+    # transfer token from this address to owner (message sender)
+    token_transfer: bool = ERC20(_token_address).transfer(
+        msg.sender,
+        ERC20(_token_address).balanceOf(self)
+    )
+    assert token_transfer
+    return True
+
+
+# protocol parameter functions
+@public
+def set_position_threshold(_value: uint256) -> bool:
+    assert msg.sender == self.owner
+    self.position_threshold = _value
+    log.ProtocolParameterPositionThresholdNotification(msg.sender, _value)
+    return True
+
+
+@public
+def set_wrangler_status(_address: address, _is_active: bool) -> bool:
+    assert msg.sender == self.owner
+    self.wranglers[_address] = _is_active
+    log.ProtocolParameterWranglerStatusNotification(_address, _is_active)
+    return True
+
+
+@public
+def set_token_support(_address: address, _is_active: bool) -> bool:
+    assert msg.sender == self.owner
+    assert self.is_contract(_address)
+    self.supported_tokens[_address] = _is_active
+    log.ProtocolParameterTokenSupportNotification(_address, _is_active)
+    return True
+
+
+# internal functions
 @private
 def record_position(_lender: address, _borrower: address, _position_hash: bytes32):
     assert self.can_borrow(_borrower)
@@ -261,12 +284,6 @@ def remove_position(_position_hash: bytes32):
     self.lend_positions[_lender][self.lend_positions_count[_lender]] = EMPTY_BYTES32
     self.lend_position_index[_lender][_position_hash] = 0
     self.lend_positions_count[_lender] -= 1
-
-
-@public
-@constant
-def position_counts(_address: address) -> (uint256, uint256):
-    return (self.borrow_positions_count[_address], self.lend_positions_count[_address])
 
 
 @private
@@ -353,6 +370,7 @@ def open_position(
     log.PositionStatusNotification(_new_position.wrangler, _new_position.hash, "status", self.POSITION_STATUS_OPEN)
 
 
+# external functions
 @public
 def topup_position(_position_hash: bytes32, _borrow_currency_increment: uint256) -> bool:
     existing_position: Position = self.positions[_position_hash]
@@ -580,9 +598,3 @@ def cancel_kernel(
     self.kernels_cancelled[_k_hash] += _lend_currency_cancel_value
 
     return True
-
-
-@public
-@payable
-def __default__():
-    pass
