@@ -67,7 +67,6 @@ PositionBorrowCurrencyNotification: event({_wrangler: indexed(address), _positio
 protocol_token_address: public(address)
 owner: public(address)
 # kernel
-kernel_per_position_nonce: public(map(bytes32, map(bytes32, uint256)))
 kernels_filled: public(map(bytes32, uint256))
 kernels_cancelled: public(map(bytes32, uint256))
 # all positions
