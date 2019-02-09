@@ -60,6 +60,9 @@ contract ERC20:
     def allowance(_owner: address, _spender: address) -> uint256: constant
 
 # Events of the protocol.
+ProtocolParameterPositionThresholdNotification: event({_changer: indexed(address), _notification_value: uint256})
+ProtocolParameterWranglerStatusNotification: event({_wrangler: indexed(address), _status: bool})
+ProtocolParameterTokenSupportNotification: event({_token_address: indexed(address), _support_status: bool})
 PositionStatusNotification: event({_wrangler: indexed(address), _position_hash: indexed(bytes32), _notification_key: bytes[6], _notification_value: uint256})
 PositionBorrowCurrencyNotification: event({_wrangler: indexed(address), _position_hash: indexed(bytes32), _notification_key: bytes[21], _notification_value: uint256})
 
@@ -121,6 +124,7 @@ def is_contract(_address: address) -> bool:
 def set_position_threshold(_value: uint256) -> bool:
     assert msg.sender == self.owner
     self.position_threshold = _value
+    log.ProtocolParameterPositionThresholdNotification(msg.sender, _value)
     return True
 
 
@@ -128,6 +132,7 @@ def set_position_threshold(_value: uint256) -> bool:
 def set_wrangler_status(_address: address, _is_active: bool) -> bool:
     assert msg.sender == self.owner
     self.wranglers[_address] = _is_active
+    log.ProtocolParameterWranglerStatusNotification(_address, _is_active)
     return True
 
 
@@ -136,6 +141,7 @@ def set_token_support(_address: address, _is_active: bool) -> bool:
     assert msg.sender == self.owner
     assert self.is_contract(_address)
     self.supported_tokens[_address] = _is_active
+    log.ProtocolParameterTokenSupportNotification(_address, _is_active)
     return True
 
 
