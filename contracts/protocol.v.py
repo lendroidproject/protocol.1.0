@@ -545,7 +545,7 @@ def fill_kernel(
         _nonce, _kernel_daily_interest_rate,
         _position_duration_in_seconds, _timestamps[1], _sig_data[1]
     )
-    # transfer relayerFeeLST from lender to relayer
+    # transfer relayerFeeLST from kernel creator to relayer
     if _addresses[2] != ZERO_ADDRESS:
         token_transfer: bool = ERC20(self.protocol_token_address).transferFrom(
             _kernel_creator,
