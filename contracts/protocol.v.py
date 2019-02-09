@@ -107,7 +107,7 @@ def __init__(_protocol_token_address: address):
     self.SECONDS_PER_DAY = 86400
     self.POSITION_STATUS_OPEN = 1
     self.POSITION_STATUS_CLOSED = 2
-    self.POSITION_STATUS_LIQUIDATED = 4
+    self.POSITION_STATUS_LIQUIDATED = 3
     self.POSITION_TOPPED_UP = 1
 
 
