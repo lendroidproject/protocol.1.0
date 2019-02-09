@@ -272,17 +272,25 @@ def record_position(_lender: address, _borrower: address, _position_hash: bytes3
 
 @private
 def remove_position(_position_hash: bytes32):
-    # borrow position
     _borrower: address = self.positions[_position_hash].borrower
     _lender: address = self.positions[_position_hash].lender
-    self.borrow_positions[_borrower][self.borrow_position_index[_borrower][_position_hash]] = self.borrow_positions[_borrower][self.borrow_positions_count[_borrower]]
-    self.borrow_positions[_borrower][self.borrow_positions_count[_borrower]] = EMPTY_BYTES32
+    # update borrow position indices
+    _current_position_index: uint256 = self.borrow_position_index[_borrower][_position_hash]
+    _last_position_index: uint256 = self.borrow_positions_count[_borrower]
+    _last_position_hash: bytes32 = self.borrow_positions[_borrower][_last_position_index]
+    self.borrow_positions[_borrower][_current_position_index] = self.borrow_positions[_borrower][_last_position_index]
+    self.borrow_positions[_borrower][_last_position_index] = EMPTY_BYTES32
     self.borrow_position_index[_borrower][_position_hash] = 0
+    self.borrow_position_index[_borrower][_last_position_hash] = _current_position_index
     self.borrow_positions_count[_borrower] -= 1
-    # lend position
-    self.lend_positions[_lender][self.lend_position_index[_lender][_position_hash]] = self.lend_positions[_lender][self.lend_positions_count[_lender]]
-    self.lend_positions[_lender][self.lend_positions_count[_lender]] = EMPTY_BYTES32
+    # update lend position indices
+    _current_position_index = self.lend_position_index[_lender][_position_hash]
+    _last_position_index = self.lend_positions_count[_lender]
+    _last_position_hash = self.lend_positions[_lender][_last_position_index]
+    self.lend_positions[_lender][_current_position_index] = self.lend_positions[_lender][_last_position_index]
+    self.lend_positions[_lender][_last_position_index] = EMPTY_BYTES32
     self.lend_position_index[_lender][_position_hash] = 0
+    self.lend_position_index[_lender][_last_position_hash] = _current_position_index
     self.lend_positions_count[_lender] -= 1
 
 
