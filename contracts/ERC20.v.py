@@ -57,6 +57,19 @@ def allowance(_owner : address, _spender : address) -> uint256:
     return self.allowances[_owner][_spender]
 
 
+@private
+def _transfer(_from: address, _to : address, _value : uint256):
+    """
+    @dev Transfer token for a specified addresses
+    @param from The address to transfer from.
+    @param to The address to transfer to.
+    @param value The amount to be transferred.
+    """
+    self.balances[_from] -= _value
+    self.balances[_to] += _value
+    log.Transfer(_from, _to, _value)
+
+
 @public
 def transfer(_to : address, _value : uint256) -> bool:
     """
@@ -64,27 +77,20 @@ def transfer(_to : address, _value : uint256) -> bool:
     @param _to The address to transfer to.
     @param _value The amount to be transferred.
     """
-    self.balances[msg.sender] -= _value
-    self.balances[_to] += _value
-    log.Transfer(msg.sender, _to, _value)
+    self._transfer(msg.sender, _to, _value)
     return True
 
 
-@public
-def transferFrom(_from : address, _to : address, _value : uint256) -> bool:
+@private
+def _approve(_owner: address, _spender : address, _value : uint256):
     """
-     @dev Transfer tokens from one address to another.
-          Note that while this function emits an Approval event, this is not required as per the specification,
-          and other compliant implementations may not emit the event.
-     @param _from address The address which you want to send tokens from
-     @param _to address The address which you want to transfer to
-     @param _value uint256 the amount of tokens to be transferred
+    @dev Approve an address to spend another addresses' tokens.
+    @param _owner The address that owns the tokens.
+    @param _spender The address which will spend the funds.
+    @param _value The amount of tokens to be spent.
     """
-    self.balances[_from] -= _value
-    self.balances[_to] += _value
-    self.allowances[_from][msg.sender] -= _value
-    log.Transfer(_from, _to, _value)
-    return True
+    self.allowances[_owner][_spender] = _value
+    log.Approval(_owner, _spender, _value)
 
 
 @public
@@ -98,8 +104,22 @@ def approve(_spender : address, _value : uint256) -> bool:
     @param _spender The address which will spend the funds.
     @param _value The amount of tokens to be spent.
     """
-    self.allowances[msg.sender][_spender] = _value
-    log.Approval(msg.sender, _spender, _value)
+    self._approve(msg.sender, _spender, _value)
+    return True
+
+
+@public
+def transferFrom(_from : address, _to : address, _value : uint256) -> bool:
+    """
+     @dev Transfer tokens from one address to another.
+          Note that while this function emits an Approval event, this is not required as per the specification,
+          and other compliant implementations may not emit the event.
+     @param _from address The address which you want to send tokens from
+     @param _to address The address which you want to transfer to
+     @param _value uint256 the amount of tokens to be transferred
+    """
+    self._transfer(_from, _to, _value)
+    self._approve(_from, msg.sender, as_unitless_number(self.allowances[_from][msg.sender]) - as_unitless_number(_value))
     return True
 
 
@@ -149,5 +169,5 @@ def burnFrom(_to: address, _value: uint256):
     @param _to The account whose tokens will be burned.
     @param _value The amount that will be burned.
     """
-    self.allowances[_to][msg.sender] -= _value
     self._burn(_to, _value)
+    self._approve(_to, msg.sender, as_unitless_number(self.allowances[_to][msg.sender]) - as_unitless_number(_value))
