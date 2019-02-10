@@ -60,11 +60,8 @@ contract ERC20:
     def allowance(_owner: address, _spender: address) -> uint256: constant
 
 # Events of the protocol.
-ProtocolParameterPositionThresholdNotification: event({_changer: indexed(address), _notification_value: uint256})
-ProtocolParameterWranglerStatusNotification: event({_wrangler: indexed(address), _status: bool})
-ProtocolParameterTokenSupportNotification: event({_token_address: indexed(address), _support_status: bool})
-PositionStatusNotification: event({_wrangler: indexed(address), _position_hash: indexed(bytes32), _notification_key: bytes[6], _notification_value: uint256})
-PositionBorrowCurrencyNotification: event({_wrangler: indexed(address), _position_hash: indexed(bytes32), _notification_key: bytes[21], _notification_value: uint256})
+ProtocolParameterUpdateNotification: event({_notification_key: string[64], _address: indexed(address), _notification_value: uint256})
+PositionUpdateNotification: event({_wrangler: indexed(address), _position_hash: indexed(bytes32), _notification_key: string[64], _notification_value: uint256})
 
 # Variables of the protocol.
 protocol_token_address: public(address)
@@ -234,7 +231,7 @@ def escape_hatch_token(_token_address: address) -> bool:
 def set_position_threshold(_value: uint256) -> bool:
     assert msg.sender == self.owner
     self.position_threshold = _value
-    log.ProtocolParameterPositionThresholdNotification(msg.sender, _value)
+    log.ProtocolParameterUpdateNotification("position_threshold", ZERO_ADDRESS, _value)
     return True
 
 
@@ -242,7 +239,7 @@ def set_position_threshold(_value: uint256) -> bool:
 def set_wrangler_status(_address: address, _is_active: bool) -> bool:
     assert msg.sender == self.owner
     self.wranglers[_address] = _is_active
-    log.ProtocolParameterWranglerStatusNotification(_address, _is_active)
+    log.ProtocolParameterUpdateNotification("wrangler_status", _address, convert(_is_active, uint256))
     return True
 
 
@@ -251,7 +248,7 @@ def set_token_support(_address: address, _is_active: bool) -> bool:
     assert msg.sender == self.owner
     assert self.is_contract(_address)
     self.supported_tokens[_address] = _is_active
-    log.ProtocolParameterTokenSupportNotification(_address, _is_active)
+    log.ProtocolParameterUpdateNotification("token_support", _address, convert(_is_active, uint256))
     return True
 
 
@@ -376,7 +373,7 @@ def open_position(
     )
     assert token_transfer
     # Notify wrangler that a position has been opened
-    log.PositionStatusNotification(_new_position.wrangler, _new_position.hash, "status", self.POSITION_STATUS_OPEN)
+    log.PositionUpdateNotification(_new_position.wrangler, _new_position.hash, "status", self.POSITION_STATUS_OPEN)
 
 
 # external functions
@@ -403,7 +400,7 @@ def topup_position(_position_hash: bytes32, _borrow_currency_increment: uint256)
     )
     assert token_transfer
     # Notify wrangler that a position has been topped up
-    log.PositionBorrowCurrencyNotification(existing_position.wrangler, _position_hash, "borrow_currency_value", self.POSITION_TOPPED_UP)
+    log.PositionUpdateNotification(existing_position.wrangler, _position_hash, "borrow_currency_value", self.POSITION_TOPPED_UP)
     # unlock position_non_reentrant for topup
     self.position_locks[method_id('topup_position()', bytes32)][_position_hash] = False
 
@@ -433,7 +430,7 @@ def liquidate_position(_position_hash: bytes32) -> bool:
     )
     assert token_transfer
     # Notify wrangler that a position has been liquidated
-    log.PositionStatusNotification(existing_position.wrangler, _position_hash, "status", self.POSITION_STATUS_LIQUIDATED)
+    log.PositionUpdateNotification(existing_position.wrangler, _position_hash, "status", self.POSITION_STATUS_LIQUIDATED)
     # unlock position_non_reentrant for liquidation
     self.position_locks[method_id('liquidate_position()', bytes32)][_position_hash] = False
 
@@ -470,7 +467,7 @@ def close_position(_position_hash: bytes32) -> bool:
     )
     assert token_transfer
     # Notify wrangler that a position has been closed
-    log.PositionStatusNotification(existing_position.wrangler, _position_hash, "status", self.POSITION_STATUS_CLOSED)
+    log.PositionUpdateNotification(existing_position.wrangler, _position_hash, "status", self.POSITION_STATUS_CLOSED)
     # unlock position_non_reentrant for closure
     self.position_locks[method_id('close_position()', bytes32)][_position_hash] = False
 
