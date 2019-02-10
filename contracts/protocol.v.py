@@ -49,8 +49,8 @@ struct Position:
 
 # Interface for the ERC20 contract, used mainly for `transfer` and `transferFrom` functions
 contract ERC20:
-    def name() -> bytes32: constant
-    def symbol() -> bytes32: constant
+    def name() -> string[64]: constant
+    def symbol() -> string[32]: constant
     def decimals() -> uint256: constant
     def balanceOf(_owner: address) -> uint256: constant
     def totalSupply() -> uint256: constant
@@ -347,7 +347,8 @@ def open_position(
     # increment wrangler's nonce for kernel creator
     self.wrangler_nonces[_new_position.wrangler][_kernel_creator] += 1
     # validate wrangler's signature
-    assert _new_position.wrangler == ecrecover(sha3(concat("\x19Ethereum Signed Message:\n32", _new_position.hash)), _sig_data[0], _sig_data[1], _sig_data[2])
+    sign_prefix: bytes[32] = "\x19Ethereum Signed Message:\n32"
+    assert _new_position.wrangler == ecrecover(sha3(concat(sign_prefix, _new_position.hash)), _sig_data[0], _sig_data[1], _sig_data[2])
     # update position index and record position
     self.position_index[self.last_position_index] = _new_position.hash
     self.last_position_index += 1
@@ -542,7 +543,8 @@ def fill_kernel(
         _kernel.relayer_fee, _kernel.monitoring_fee, _kernel.rollover_fee, _kernel.closure_fee],
         _kernel.expires_at, _kernel.salt, _kernel.daily_interest_rate, _kernel.position_duration_in_seconds)
     # validate kernel_creator's signature
-    assert _kernel_creator == ecrecover(sha3(concat("\x19Ethereum Signed Message:\n32", _k_hash)), _sig_data[0][0], _sig_data[0][1], _sig_data[0][2])
+    sign_prefix: bytes[32] = "\x19Ethereum Signed Message:\n32"
+    assert _kernel_creator == ecrecover(sha3(concat(sign_prefix, _k_hash)), _sig_data[0][0], _sig_data[0][1], _sig_data[0][2])
     # validate loan amount to be filled
     assert as_unitless_number(_kernel.lend_currency_offered_value) - as_unitless_number(self.filled_or_cancelled_loan_amount(_k_hash)) >= as_unitless_number(_values[6])
     # fill offer with lending currency
@@ -597,7 +599,8 @@ def cancel_kernel(
         _kernel.relayer_fee, _kernel.monitoring_fee, _kernel.rollover_fee, _kernel.closure_fee],
         _kernel.expires_at, _kernel.salt, _kernel.daily_interest_rate, _kernel.position_duration_in_seconds)
     # verify sender is kernel signer
-    assert msg.sender == ecrecover(sha3(concat("\x19Ethereum Signed Message:\n32", _k_hash)), _sig_data[0], _sig_data[1], _sig_data[2])
+    sign_prefix: bytes[32] = "\x19Ethereum Signed Message:\n32"
+    assert msg.sender == ecrecover(sha3(concat(sign_prefix, _k_hash)), _sig_data[0], _sig_data[1], _sig_data[2])
     # verify sanity of offered and cancellation amounts
     assert as_unitless_number(_kernel.lend_currency_offered_value) > 0
     assert as_unitless_number(_lend_currency_cancel_value) > 0
