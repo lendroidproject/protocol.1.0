@@ -144,8 +144,9 @@ def filled_or_cancelled_loan_amount(_kernel_hash: bytes32) -> uint256:
 
 @public
 @constant
-def position(_position_hash: bytes32) -> Position:
-    return self.positions[_position_hash]
+def position(_position_hash: bytes32) -> (uint256, address, address, address, address, address, timestamp, timestamp, timestamp, address, address, uint256, uint256,
+    uint256, uint256, uint256, uint256, uint256, uint256, uint256, uint256, bytes32):
+    return (self.positions[_position_hash].index, self.positions[_position_hash].kernel_creator, self.positions[_position_hash].lender, self.positions[_position_hash].borrower, self.positions[_position_hash].relayer, self.positions[_position_hash].wrangler, self.positions[_position_hash].created_at, self.positions[_position_hash].updated_at, self.positions[_position_hash].expires_at, self.positions[_position_hash].borrow_currency_address, self.positions[_position_hash].lend_currency_address, self.positions[_position_hash].borrow_currency_value, self.positions[_position_hash].borrow_currency_current_value, self.positions[_position_hash].lend_currency_filled_value, self.positions[_position_hash].lend_currency_owed_value, self.positions[_position_hash].status, self.positions[_position_hash].nonce, self.positions[_position_hash].relayer_fee, self.positions[_position_hash].monitoring_fee, self.positions[_position_hash].rollover_fee, self.positions[_position_hash].closure_fee, self.positions[_position_hash].hash)
 
 
 @public
