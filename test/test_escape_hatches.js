@@ -19,15 +19,15 @@ contract("Protocol", function (addresses) {
 
 
   it("protocol contract should not accept ether", async function() {
-    assert.isTrue(web3.toDecimal(web3.eth.getBalance(this.protocolContract.address)) === 0, `protocol contract's initial balance should be 0 ether`)
+    assert.isTrue(web3.utils.toDecimal((await web3.eth.getBalance(this.protocolContract.address))) === 0, `protocol contract's initial balance should be 0 ether`)
     let errr = false
     try {
-      web3.eth.sendTransaction({from: addresses[7], to:this.protocolContract.address, value: web3.toWei(1, 'ether'), gasLimit: 21000, gasPrice: 20000000000})
+      await web3.eth.sendTransaction({from: addresses[7], to:this.protocolContract.address, value: web3.utils.toWei(1, 'ether'), gasLimit: 21000, gasPrice: 20000000000})
     } catch (e) {
       errr = true
     }
     assert.isTrue(errr, 'Protocol contract should reject ETH transfer')
-    assert.isTrue(web3.toDecimal(web3.eth.getBalance(this.protocolContract.address)) === 0, `protocol contract's initial balance should be 0 ether`)
+    assert.isTrue(web3.utils.toDecimal((await web3.eth.getBalance(this.protocolContract.address))) === 0, `protocol contract's initial balance should be 0 ether`)
   });
 
   it("escape_hatch_token should be called only by owner", async function() {
@@ -53,7 +53,7 @@ contract("Protocol", function (addresses) {
     let maliciousToken = await ERC20.new("Test Yet Another Token", "TYT", 18, 2, {from: maliciousUserAddress});
     let tokenBalance = await maliciousToken.balanceOf(maliciousUserAddress)
     assert.isTrue(tokenBalance.toString() === "2000000000000000000", `maliciousUserAddress should have a token balance of 2 TYT`)
-    tx = maliciousToken.transfer(this.protocolContract.address, web3._extend.utils.toWei('2', 'ether'), {from: maliciousUserAddress})
+    tx = maliciousToken.transfer(this.protocolContract.address, web3.utils.toWei('2', 'ether'), {from: maliciousUserAddress})
     await mineTx(tx);
     tokenBalance = await maliciousToken.balanceOf(maliciousUserAddress)
     assert.isTrue(tokenBalance.toString() === "0", `maliciousUserAddress should have a token balance of 0 TYT`)
