@@ -112,6 +112,26 @@ def __init__(_protocol_token_address: address):
 
 
 # constant functions
+@public
+@constant
+def ecrecover_from_signature(_hash: bytes32, _sig: bytes[65]) -> address:
+    """
+    @info Inspired from https://github.com/LayerXcom/verified-vyper-contracts/blob/master/contracts/ecdsa/ECDSA.vy
+    @dev Recover signer address from a message by using their signature
+    @param _hash bytes32 message, the hash is the signed message. What is recovered is the signer address.
+    @param _sig bytes signature, the signature is generated using web3.eth.sign()
+    """
+    if len(_sig) != 65:
+        return ZERO_ADDRESS
+    r: uint256 = extract32(_sig, 0, type=uint256)
+    s: uint256 = extract32(_sig, 32, type=uint256)
+    v: int128 = convert(slice(_sig, start=64, len=1), int128)
+    if v < 27:
+        v += 27
+    if v in [27, 28]:
+        return ecrecover(_hash, convert(v, uint256), r, s)
+    return ZERO_ADDRESS
+
 @private
 @constant
 def is_contract(_address: address) -> bool:
@@ -153,6 +173,27 @@ def position(_position_hash: bytes32) -> (uint256, address, address, address, ad
 @constant
 def position_counts(_address: address) -> (uint256, uint256):
     return (self.borrow_positions_count[_address], self.lend_positions_count[_address])
+
+
+@public
+@constant
+def simple_interest(
+        _principal: uint256,
+        _daily_interest_rate: uint256,
+        _time_period_in_seconds: timedelta
+    ) -> uint256:
+    _time_period_in_days: uint256 = as_unitless_number(_time_period_in_seconds) / as_unitless_number(self.SECONDS_PER_DAY)
+    return as_unitless_number(_principal) * as_unitless_number(_time_period_in_days) * as_unitless_number(_daily_interest_rate) / 100
+
+
+@public
+@constant
+def amount(
+        _principal: uint256,
+        _interest: uint256,
+        _time_period: timedelta
+    ) -> uint256:
+    return as_unitless_number(_principal) + as_unitless_number(self.simple_interest(_principal, _interest, _time_period))
 
 
 @public
@@ -303,13 +344,11 @@ def open_position(
         _kernel_daily_interest_rate: uint256,
         _position_duration_in_seconds: timedelta,
         _approval_expires: timestamp,
-        _sig_data: uint256[3]
+        _sig_data: bytes[65]
         # v, r, s of wrangler
     ):
     # calculate owed value
-    _position_duration_in_days: uint256 = as_unitless_number(_position_duration_in_seconds) / as_unitless_number(self.SECONDS_PER_DAY)
-    _total_interest: uint256 = as_unitless_number(_values[6]) * as_unitless_number(_position_duration_in_days) * as_unitless_number(_kernel_daily_interest_rate) / 100
-    _lend_currency_owed_value: uint256 = as_unitless_number(_values[6]) + _total_interest
+    _lend_currency_owed_value: uint256 = self.amount(_values[6], _kernel_daily_interest_rate, _position_duration_in_seconds)
     # create position from struct
     _new_position: Position = Position({
         index: self.last_position_index,
@@ -346,7 +385,8 @@ def open_position(
     self.wrangler_nonces[_new_position.wrangler][_kernel_creator] += 1
     # validate wrangler's signature
     sign_prefix: bytes[32] = "\x19Ethereum Signed Message:\n32"
-    assert _new_position.wrangler == ecrecover(sha3(concat(sign_prefix, _new_position.hash)), _sig_data[0], _sig_data[1], _sig_data[2])
+    assert _new_position.wrangler == self.ecrecover_from_signature(sha3(concat(sign_prefix, _new_position.hash)), _sig_data)
+    # assert _new_position.wrangler == self.ecrecover_from_signature(_new_position.hash, _sig_data)
     # update position index and record position
     self.position_index[self.last_position_index] = _new_position.hash
     self.last_position_index += 1
@@ -489,7 +529,8 @@ def fill_kernel(
         _position_duration_in_seconds: timedelta,
         # loanDuration
         _kernel_creator_salt: bytes32,
-        _sig_data: uint256[3][2]
+        _sig_data_kernel_creator: bytes[65],
+        _sig_data_wrangler: bytes[65]
         # v, r, s of kernel_creator and wrangler
         ) -> bool:
     # validate _lender is not empty
@@ -540,9 +581,8 @@ def fill_kernel(
         [_kernel.lend_currency_offered_value,
         _kernel.relayer_fee, _kernel.monitoring_fee, _kernel.rollover_fee, _kernel.closure_fee],
         _kernel.expires_at, _kernel.salt, _kernel.daily_interest_rate, _kernel.position_duration_in_seconds)
-    # validate kernel_creator's signature
-    sign_prefix: bytes[32] = "\x19Ethereum Signed Message:\n32"
-    assert _kernel_creator == ecrecover(sha3(concat(sign_prefix, _k_hash)), _sig_data[0][0], _sig_data[0][1], _sig_data[0][2])
+    # # validate kernel_creator's signature
+    assert _kernel_creator == self.ecrecover_from_signature(_k_hash, _sig_data_kernel_creator)
     # validate loan amount to be filled
     assert as_unitless_number(_kernel.lend_currency_offered_value) - as_unitless_number(self.filled_or_cancelled_loan_amount(_k_hash)) >= as_unitless_number(_values[6])
     # fill offer with lending currency
@@ -551,7 +591,7 @@ def fill_kernel(
     self.open_position(
         _kernel_creator, _addresses, _values,
         _nonce, _kernel_daily_interest_rate,
-        _position_duration_in_seconds, _timestamps[1], _sig_data[1]
+        _position_duration_in_seconds, _timestamps[1], _sig_data_wrangler
     )
     # transfer relayerFeeLST from kernel creator to relayer
     if _addresses[2] != ZERO_ADDRESS:
@@ -570,7 +610,7 @@ def cancel_kernel(
         _addresses: address[6], _values: uint256[5],
         _kernel_expires: timestamp, _kernel_creator_salt: bytes32,
         _kernel_daily_interest_rate: uint256, _position_duration_in_seconds: timedelta,
-        _sig_data: uint256[3],
+        _sig_data: bytes[65],
         _lend_currency_cancel_value: uint256) -> bool:
     # compute kernel hash from inputs
     _kernel: Kernel = Kernel({
@@ -596,9 +636,8 @@ def cancel_kernel(
         [_kernel.lend_currency_offered_value,
         _kernel.relayer_fee, _kernel.monitoring_fee, _kernel.rollover_fee, _kernel.closure_fee],
         _kernel.expires_at, _kernel.salt, _kernel.daily_interest_rate, _kernel.position_duration_in_seconds)
-    # verify sender is kernel signer
-    sign_prefix: bytes[32] = "\x19Ethereum Signed Message:\n32"
-    assert msg.sender == ecrecover(sha3(concat(sign_prefix, _k_hash)), _sig_data[0], _sig_data[1], _sig_data[2])
+    # # verify sender is kernel signer
+    assert msg.sender == self.ecrecover_from_signature(_k_hash, _sig_data)
     # verify sanity of offered and cancellation amounts
     assert as_unitless_number(_kernel.lend_currency_offered_value) > 0
     assert as_unitless_number(_lend_currency_cancel_value) > 0
