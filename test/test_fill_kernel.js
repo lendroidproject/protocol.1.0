@@ -26,9 +26,9 @@ contract("Protocol", function (addresses) {
     this.wrangler = addresses[4];
     //// kernel terms
     // uint256 values
-    this.kernel_daily_interest_rate = 10
+    this.kernel_daily_interest_rate = web3._extend.utils.toWei('0.08', 'ether')
     // timedelta values
-    this.kernel_position_duration_in_seconds = 5
+    this.kernel_position_duration_in_seconds = 2 * 60 * 60 * 24
     this.wrangler_approval_duration_in_seconds = 5 * 60
     // wei values
     this.kernel_lending_currency_maximum_value = web3._extend.utils.toWei('40', 'ether')
@@ -41,9 +41,9 @@ contract("Protocol", function (addresses) {
     // bytes32 values
     this.kernel_creator_salt = `0x${saltGenerator()}`
     // position terms
-    this.position_lending_currency_fill_value = web3._extend.utils.toWei('30', 'ether')
-    this.position_borrow_currency_fill_value = web3._extend.utils.toWei('3', 'ether')
-    this.position_lending_currency_owed_value = web3._extend.utils.toWei('30', 'ether')
+    this.position_lending_currency_fill_value = web3._extend.utils.toWei('1', 'ether')
+    this.position_borrow_currency_fill_value = web3._extend.utils.toWei('0.1', 'ether')
+    this.position_lending_currency_owed_value = web3._extend.utils.toWei('1.0016', 'ether')
   });
 
 
@@ -107,8 +107,7 @@ contract("Protocol", function (addresses) {
       this.kernel_expires_at, this.kernel_creator_salt,
       this.kernel_daily_interest_rate, this.kernel_position_duration_in_seconds
     )
-    let _kernel_creator_signature = web3.eth.sign(this.lender, kernel_hash)
-    _kernel_creator_signature = _kernel_creator_signature.substr(2)
+    this.kernel_creator_signature= web3.eth.sign(this.lender, kernel_hash)
     // Sign position hash as wrangler
     let _nonce = '1';
     this.position_hash = await this.protocolContract.position_hash(
@@ -125,7 +124,6 @@ contract("Protocol", function (addresses) {
     )
     let _wrangler_approval_expiry_timestamp = web3.eth.getBlock(web3.eth.blockNumber).timestamp + this.wrangler_approval_duration_in_seconds
     let _wrangler_signature = web3.eth.sign(this.wrangler, this.position_hash)
-    _wrangler_signature = _wrangler_signature.substr(2)
     // prepare inputs
     let _is_creator_lender = true;
     // test pre-call
@@ -151,18 +149,8 @@ contract("Protocol", function (addresses) {
       ],
       this.kernel_position_duration_in_seconds,
       this.kernel_creator_salt,
-      [
-        [
-          `${_kernel_creator_signature.slice(128, 130)}` === '00' ? web3._extend.utils.toBigNumber(27) : web3._extend.utils.toBigNumber(28),
-          web3._extend.utils.toBigNumber(`0x${_kernel_creator_signature.slice(0, 64)}`),
-          web3._extend.utils.toBigNumber(`0x${_kernel_creator_signature.slice(64, 128)}`)
-        ],
-        [
-          `${_wrangler_signature.slice(128, 130)}` === '00' ? web3._extend.utils.toBigNumber(27) : web3._extend.utils.toBigNumber(28),
-          web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(0, 64)}`),
-          web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(64, 128)}`)
-        ],
-      ],
+      this.kernel_creator_signature,
+      _wrangler_signature,
       {from: addresses[0]}
     );
 

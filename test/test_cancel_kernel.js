@@ -1,6 +1,7 @@
 // helpers
 const mineTx = require("./helpers/mineTx.js");
 const delay = require("./helpers/delay.js");
+const saltGenerator = require("./helpers/saltGenerator.js");
 // contracts
 var ERC20 = artifacts.require('ERC20.vyper'),
   Protocol = artifacts.require('protocol.vyper');
@@ -40,7 +41,7 @@ contract("Protocol", function (addresses) {
     // timestamp values
     this.kernel_expires_at = web3.eth.getBlock(web3.eth.blockNumber).timestamp + 86400*2
     // bytes32 values
-    this.kernel_creator_salt = '0x92c0b12fa215396ed0867a9a871aee1a17657643000000000000000000000000'
+    this.kernel_creator_salt = `0x${saltGenerator()}`
     // position terms
     this.position_lending_currency_fill_value = web3._extend.utils.toWei('30', 'ether')
     this.position_borrow_currency_fill_value = web3._extend.utils.toWei('3', 'ether')
@@ -75,19 +76,15 @@ contract("Protocol", function (addresses) {
       this.kernel_expires_at, this.kernel_creator_salt,
       this.kernel_daily_interest_rate, this.kernel_position_duration_in_seconds
     )
-    let _kernel_creator_signature= web3.eth.sign(this.lender, kernel_hash)
-    _kernel_creator_signature = _kernel_creator_signature.substr(2)
+    this.kernel_creator_signature= web3.eth.sign(this.lender, kernel_hash)
+    // let _kernel_creator_signature= web3.eth.sign(this.lender, kernel_hash)
+    // _kernel_creator_signature = _kernel_creator_signature.substr(2)
     this.kernel_addresses = [
       this.lender, this.ZERO_ADDRESS, this.relayer, this.wrangler, this.BorrowToken.address, this.LendToken.address
     ]
     this.kernel_values = [
       this.kernel_lending_currency_maximum_value,
       this.kernel_relayer_fee, this.kernel_monitoring_fee, this.kernel_rollover_fee, this.kernel_closure_fee
-    ]
-    this.vrsCreator = [
-      `${_kernel_creator_signature.slice(128, 130)}` === '00' ? web3._extend.utils.toBigNumber(27) : web3._extend.utils.toBigNumber(28),
-      web3._extend.utils.toBigNumber(`0x${_kernel_creator_signature.slice(0, 64)}`),
-      web3._extend.utils.toBigNumber(`0x${_kernel_creator_signature.slice(64, 128)}`)
     ]
   });
 
@@ -98,7 +95,7 @@ contract("Protocol", function (addresses) {
       await this.protocolContract.cancel_kernel(
         this.kernel_addresses, this.kernel_values,
         this.kernel_expires_at, this.kernel_creator_salt, this.kernel_daily_interest_rate, this.kernel_position_duration_in_seconds,
-        this.vrsCreator,
+        this.kernel_creator_signature,
         _lend_currency_cancel_value,
         {from: this.borrower}
       );
@@ -111,7 +108,7 @@ contract("Protocol", function (addresses) {
       await this.protocolContract.cancel_kernel(
         this.kernel_addresses, this.kernel_values,
         this.kernel_expires_at, this.kernel_creator_salt, this.kernel_daily_interest_rate, this.kernel_position_duration_in_seconds,
-        this.vrsCreator,
+        this.kernel_creator_signature,
         _lend_currency_cancel_value,
         {from: this.relayer}
       );
@@ -124,7 +121,7 @@ contract("Protocol", function (addresses) {
       await this.protocolContract.cancel_kernel(
         this.kernel_addresses, this.kernel_values,
         this.kernel_expires_at, this.kernel_creator_salt, this.kernel_daily_interest_rate, this.kernel_position_duration_in_seconds,
-        this.vrsCreator,
+        this.kernel_creator_signature,
         _lend_currency_cancel_value,
         {from: this.wrangler}
       );
@@ -137,7 +134,7 @@ contract("Protocol", function (addresses) {
       await this.protocolContract.cancel_kernel(
         this.kernel_addresses, this.kernel_values,
         this.kernel_expires_at, this.kernel_creator_salt, this.kernel_daily_interest_rate, this.kernel_position_duration_in_seconds,
-        this.vrsCreator,
+        this.kernel_creator_signature,
         _lend_currency_cancel_value,
         {from: this.lender}
       );
@@ -154,7 +151,7 @@ contract("Protocol", function (addresses) {
       await this.protocolContract.cancel_kernel(
         this.kernel_addresses, this.kernel_values,
         this.kernel_expires_at, this.kernel_creator_salt, this.kernel_daily_interest_rate, this.kernel_position_duration_in_seconds,
-        this.vrsCreator,
+        this.kernel_creator_signature,
         _lend_currency_cancel_value,
         {from: this.lender}
       );
@@ -162,6 +159,43 @@ contract("Protocol", function (addresses) {
       errr = true
     }
     assert.isTrue(errr, 'borrower should not be able to cancel kernel')
+  });
+
+  it("cancel_kernel should work for the same kernel parameters except the creator salt", async function() {
+    let _lend_currency_cancel_value = web3._extend.utils.toWei('40', 'ether')
+    await this.protocolContract.cancel_kernel(
+      this.kernel_addresses, this.kernel_values,
+      this.kernel_expires_at, this.kernel_creator_salt, this.kernel_daily_interest_rate, this.kernel_position_duration_in_seconds,
+      this.kernel_creator_signature,
+      _lend_currency_cancel_value,
+      {from: this.lender}
+    );
+    this.kernel_creator_salt = `0x${saltGenerator()}`
+    kernel_hash = await this.protocolContract.kernel_hash(
+      [
+        this.lender, this.ZERO_ADDRESS, this.relayer, this.wrangler, this.BorrowToken.address, this.LendToken.address
+      ],
+      [
+        this.kernel_lending_currency_maximum_value,
+        this.kernel_relayer_fee, this.kernel_monitoring_fee, this.kernel_rollover_fee, this.kernel_closure_fee
+      ],
+      this.kernel_expires_at, this.kernel_creator_salt,
+      this.kernel_daily_interest_rate, this.kernel_position_duration_in_seconds
+    )
+    this.kernel_creator_signature = web3.eth.sign(this.lender, kernel_hash)
+    let errr = false
+    try {
+      await this.protocolContract.cancel_kernel(
+        this.kernel_addresses, this.kernel_values,
+        this.kernel_expires_at, this.kernel_creator_salt, this.kernel_daily_interest_rate, this.kernel_position_duration_in_seconds,
+        this.kernel_creator_signature,
+        _lend_currency_cancel_value,
+        {from: this.lender}
+      );
+    } catch (e) {
+      errr = true
+    }
+    assert.isTrue(!errr, 'lender should be able to cancel a similar kernel')
   });
 
   it("cancel_kernel should work if cancel value = maximum value - filled value", async function() {
@@ -181,12 +215,12 @@ contract("Protocol", function (addresses) {
     )
     let _wrangler_approval_expiry_timestamp = web3.eth.getBlock(web3.eth.blockNumber).timestamp + this.wrangler_approval_duration_in_seconds
     let _wrangler_signature = web3.eth.sign(this.wrangler, this.position_hash)
-    _wrangler_signature = _wrangler_signature.substr(2)
-    let vrsWrangler = [
-      `${_wrangler_signature.slice(128, 130)}` === '00' ? web3._extend.utils.toBigNumber(27) : web3._extend.utils.toBigNumber(28),
-      web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(0, 64)}`),
-      web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(64, 128)}`)
-    ]
+    // _wrangler_signature = _wrangler_signature.substr(2)
+    // let vrsWrangler = [
+    //   `${_wrangler_signature.slice(128, 130)}` === '00' ? web3._extend.utils.toBigNumber(27) : web3._extend.utils.toBigNumber(28),
+    //   web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(0, 64)}`),
+    //   web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(64, 128)}`)
+    // ]
     // prepare inputs
     let _is_creator_lender = true;
     // do call
@@ -207,10 +241,8 @@ contract("Protocol", function (addresses) {
       ],
       this.kernel_position_duration_in_seconds,
       this.kernel_creator_salt,
-      [
-        this.vrsCreator,
-        vrsWrangler,
-      ],
+      this.kernel_creator_signature,
+      _wrangler_signature,
       {from: addresses[0]}
     );
     await mineTx(tx);
@@ -221,7 +253,7 @@ contract("Protocol", function (addresses) {
       await this.protocolContract.cancel_kernel(
         this.kernel_addresses, this.kernel_values,
         this.kernel_expires_at, this.kernel_creator_salt, this.kernel_daily_interest_rate, this.kernel_position_duration_in_seconds,
-        this.vrsCreator,
+        this.kernel_creator_signature,
         _lend_currency_cancel_value,
         {from: this.lender}
       );
@@ -248,12 +280,12 @@ contract("Protocol", function (addresses) {
     )
     let _wrangler_approval_expiry_timestamp = web3.eth.getBlock(web3.eth.blockNumber).timestamp + this.wrangler_approval_duration_in_seconds
     let _wrangler_signature = web3.eth.sign(this.wrangler, this.position_hash)
-    _wrangler_signature = _wrangler_signature.substr(2)
-    let vrsWrangler = [
-      `${_wrangler_signature.slice(128, 130)}` === '00' ? web3._extend.utils.toBigNumber(27) : web3._extend.utils.toBigNumber(28),
-      web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(0, 64)}`),
-      web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(64, 128)}`)
-    ]
+    // _wrangler_signature = _wrangler_signature.substr(2)
+    // let vrsWrangler = [
+    //   `${_wrangler_signature.slice(128, 130)}` === '00' ? web3._extend.utils.toBigNumber(27) : web3._extend.utils.toBigNumber(28),
+    //   web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(0, 64)}`),
+    //   web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(64, 128)}`)
+    // ]
     // prepare inputs
     let _is_creator_lender = true;
     // do call
@@ -274,10 +306,8 @@ contract("Protocol", function (addresses) {
       ],
       this.kernel_position_duration_in_seconds,
       this.kernel_creator_salt,
-      [
-        this.vrsCreator,
-        vrsWrangler,
-      ],
+      this.kernel_creator_signature,
+      _wrangler_signature,
       {from: addresses[0]}
     );
     await mineTx(tx);
@@ -288,7 +318,7 @@ contract("Protocol", function (addresses) {
       await this.protocolContract.cancel_kernel(
         this.kernel_addresses, this.kernel_values,
         this.kernel_expires_at, this.kernel_creator_salt, this.kernel_daily_interest_rate, this.kernel_position_duration_in_seconds,
-        this.vrsCreator,
+        this.kernel_creator_signature,
         _lend_currency_cancel_value,
         {from: this.lender}
       );
@@ -315,12 +345,12 @@ contract("Protocol", function (addresses) {
     )
     let _wrangler_approval_expiry_timestamp = web3.eth.getBlock(web3.eth.blockNumber).timestamp + this.wrangler_approval_duration_in_seconds
     let _wrangler_signature = web3.eth.sign(this.wrangler, this.position_hash)
-    _wrangler_signature = _wrangler_signature.substr(2)
-    let vrsWrangler = [
-      `${_wrangler_signature.slice(128, 130)}` === '00' ? web3._extend.utils.toBigNumber(27) : web3._extend.utils.toBigNumber(28),
-      web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(0, 64)}`),
-      web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(64, 128)}`)
-    ]
+    // _wrangler_signature = _wrangler_signature.substr(2)
+    // let vrsWrangler = [
+    //   `${_wrangler_signature.slice(128, 130)}` === '00' ? web3._extend.utils.toBigNumber(27) : web3._extend.utils.toBigNumber(28),
+    //   web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(0, 64)}`),
+    //   web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(64, 128)}`)
+    // ]
     // prepare inputs
     let _is_creator_lender = true;
     // do call
@@ -341,10 +371,8 @@ contract("Protocol", function (addresses) {
       ],
       this.kernel_position_duration_in_seconds,
       this.kernel_creator_salt,
-      [
-        this.vrsCreator,
-        vrsWrangler,
-      ],
+      this.kernel_creator_signature,
+      _wrangler_signature,
       {from: addresses[0]}
     );
     await mineTx(tx);
@@ -355,7 +383,7 @@ contract("Protocol", function (addresses) {
       await this.protocolContract.cancel_kernel(
         this.kernel_addresses, this.kernel_values,
         this.kernel_expires_at, this.kernel_creator_salt, this.kernel_daily_interest_rate, this.kernel_position_duration_in_seconds,
-        this.vrsCreator,
+        this.kernel_creator_signature,
         _lend_currency_cancel_value,
         {from: this.lender}
       );

@@ -92,7 +92,6 @@ supported_tokens: public(map(address, bool))
 position_locks: map(bytes32, map(bytes32, bool))
 
 # constants
-SIGNATURE_PREFIX: bytes[32]
 SECONDS_PER_DAY: public(uint256)
 POSITION_STATUS_OPEN: public(uint256)
 POSITION_STATUS_CLOSED: public(uint256)
@@ -110,17 +109,36 @@ def __init__(_protocol_token_address: address):
     self.POSITION_STATUS_CLOSED = 2
     self.POSITION_STATUS_LIQUIDATED = 3
     self.POSITION_TOPPED_UP = 1
-    self.SIGNATURE_PREFIX = "\x19Ethereum Signed Message:\n32"
 
 
 # constant functions
-@private
+@public
 @constant
-def is_signer(_prover: address, _message: bytes32, _sig_data: uint256[3]) -> bool:
-    if _prover == ecrecover(sha3(concat(self.SIGNATURE_PREFIX, _message)), _sig_data[0], _sig_data[1], _sig_data[2]):
+def ecrecover_from_signature(_hash: bytes32, _sig: bytes[65]) -> address:
+    """
+    @info Inspired from https://github.com/LayerXcom/verified-vyper-contracts/blob/master/contracts/ecdsa/ECDSA.vy
+    @dev Recover signer address from a message by using their signature
+    @param _hash bytes32 message, the hash is the signed message. What is recovered is the signer address.
+    @param _sig bytes signature, the signature is generated using web3.eth.sign()
+    """
+    if len(_sig) != 65:
+        return ZERO_ADDRESS
+    v: int128 = convert(slice(_sig, start=64, len=1), int128)
+    if v < 27:
+        v += 27
+    if v in [27, 28]:
+        return ecrecover(_hash, convert(v, uint256), extract32(_sig, 0, type=uint256), extract32(_sig, 32, type=uint256))
+    return ZERO_ADDRESS
+
+
+@public
+@constant
+def is_signer(_prover: address, _hash: bytes32, _sig: bytes[65]) -> bool:
+    if _prover == self.ecrecover_from_signature(_hash, _sig):
         return True
     else:
-        return _prover == ecrecover(_message, _sig_data[0], _sig_data[1], _sig_data[2])
+        sign_prefix: bytes[32] = "\x19Ethereum Signed Message:\n32"
+        return _prover == self.ecrecover_from_signature(sha3(concat(sign_prefix, _hash)), _sig)
 
 
 @private
@@ -225,6 +243,19 @@ def position_hash(
     )
 
 
+@public
+@constant
+def owed_value(
+        _filled_value: uint256,
+        _kernel_daily_interest_rate: uint256,
+        _position_duration_in_seconds: timedelta
+    ) -> uint256:
+    # calculate owed value
+    _position_duration_in_days: uint256 = as_unitless_number(_position_duration_in_seconds) / as_unitless_number(self.SECONDS_PER_DAY)
+    _total_interest: uint256 = as_unitless_number(_filled_value) * as_unitless_number(_position_duration_in_days) * as_unitless_number(_kernel_daily_interest_rate) / 10 ** 20
+    return as_unitless_number(_filled_value) + as_unitless_number(_total_interest)
+
+
 # escape hatch functions
 @public
 def escape_hatch_token(_token_address: address) -> bool:
@@ -314,13 +345,11 @@ def open_position(
         _kernel_daily_interest_rate: uint256,
         _position_duration_in_seconds: timedelta,
         _approval_expires: timestamp,
-        _sig_data: uint256[3]
+        _sig_data: bytes[65]
         # v, r, s of wrangler
     ):
     # calculate owed value
-    _position_duration_in_days: uint256 = as_unitless_number(_position_duration_in_seconds) / as_unitless_number(self.SECONDS_PER_DAY)
-    _total_interest: uint256 = as_unitless_number(_values[6]) * as_unitless_number(_position_duration_in_days) * as_unitless_number(_kernel_daily_interest_rate) / 100
-    _lend_currency_owed_value: uint256 = as_unitless_number(_values[6]) + _total_interest
+    _lend_currency_owed_value: uint256 = self.owed_value(_values[6], _kernel_daily_interest_rate, _position_duration_in_seconds)
     # create position from struct
     _new_position: Position = Position({
         index: self.last_position_index,
@@ -451,7 +480,7 @@ def liquidate_position(_position_hash: bytes32) -> bool:
 @public
 def close_position(_position_hash: bytes32) -> bool:
     existing_position: Position = self.positions[_position_hash]
-    # # confirm sender is borrower
+    # confirm sender is borrower
     assert msg.sender == existing_position.borrower
     # confirm position has not expired yet
     assert existing_position.expires_at >= block.timestamp
@@ -499,7 +528,8 @@ def fill_kernel(
         _position_duration_in_seconds: timedelta,
         # loanDuration
         _kernel_creator_salt: bytes32,
-        _sig_data: uint256[3][2]
+        _sig_data_kernel_creator: bytes[65],
+        _sig_data_wrangler: bytes[65]
         # v, r, s of kernel_creator and wrangler
         ) -> bool:
     # validate _lender is not empty
@@ -542,7 +572,7 @@ def fill_kernel(
     # validate asked and offered expiry timestamps
     assert _kernel.expires_at > block.timestamp
     # validate daily interest rate on Kernel is greater than 0
-    assert _kernel.daily_interest_rate > 0
+    assert as_unitless_number(_kernel.daily_interest_rate) > 0
     # compute hash of kernel
     _k_hash: bytes32 = self.kernel_hash(
         [_kernel.lender, _kernel.borrower, _kernel.relayer, _kernel.wrangler,
@@ -551,7 +581,7 @@ def fill_kernel(
         _kernel.relayer_fee, _kernel.monitoring_fee, _kernel.rollover_fee, _kernel.closure_fee],
         _kernel.expires_at, _kernel.salt, _kernel.daily_interest_rate, _kernel.position_duration_in_seconds)
     # validate kernel_creator's signature
-    assert self.is_signer(_kernel_creator, _k_hash, _sig_data[0])
+    assert self.is_signer(_kernel_creator, _k_hash, _sig_data_kernel_creator)
     # validate loan amount to be filled
     assert as_unitless_number(_kernel.lend_currency_offered_value) - as_unitless_number(self.filled_or_cancelled_loan_amount(_k_hash)) >= as_unitless_number(_values[6])
     # fill offer with lending currency
@@ -560,10 +590,10 @@ def fill_kernel(
     self.open_position(
         _kernel_creator, _addresses, _values,
         _nonce, _kernel_daily_interest_rate,
-        _position_duration_in_seconds, _timestamps[1], _sig_data[1]
+        _position_duration_in_seconds, _timestamps[1], _sig_data_wrangler
     )
     # transfer relayerFeeLST from kernel creator to relayer
-    if _addresses[2] != ZERO_ADDRESS:
+    if (_kernel.relayer != ZERO_ADDRESS) and (as_unitless_number(_kernel.relayer_fee) > 0):
         token_transfer: bool = ERC20(self.protocol_token_address).transferFrom(
             _kernel_creator,
             _kernel.relayer,
@@ -579,7 +609,7 @@ def cancel_kernel(
         _addresses: address[6], _values: uint256[5],
         _kernel_expires: timestamp, _kernel_creator_salt: bytes32,
         _kernel_daily_interest_rate: uint256, _position_duration_in_seconds: timedelta,
-        _sig_data: uint256[3],
+        _sig_data: bytes[65],
         _lend_currency_cancel_value: uint256) -> bool:
     # compute kernel hash from inputs
     _kernel: Kernel = Kernel({
