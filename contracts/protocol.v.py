@@ -89,7 +89,7 @@ wrangler_nonces: public(map(address, map(address, uint256)))
 supported_tokens: public(map(address, bool))
 
 # nonreentrant locks for positions, inspired from https://github.com/ethereum/vyper/issues/1204
-position_locks: map(bytes32, map(bytes32, bool))
+nonreentrant_locks: map(bytes32, bool)
 
 # constants
 SECONDS_PER_DAY: public(uint256)
@@ -147,10 +147,16 @@ def is_contract(_address: address) -> bool:
     return (_address != ZERO_ADDRESS) and (_address.codesize > 0)
 
 
-@public
-@constant
-def is_token_active(_address: address) -> bool:
-    return self.is_contract(_address) and self.supported_tokens[_address]
+@private
+def lock_position(_position_hash: bytes32):
+    assert self.nonreentrant_locks[_position_hash] == False
+    self.nonreentrant_locks[_position_hash] = True
+
+
+@private
+def unlock_position(_position_hash: bytes32):
+    assert self.nonreentrant_locks[_position_hash] == True
+    self.nonreentrant_locks[_position_hash] = False
 
 
 @public
@@ -378,6 +384,8 @@ def open_position(
             _values, _lend_currency_owed_value, _nonce
         )
     })
+    # lock position_non_reentrant during loan creation
+    self.lock_position(_new_position.hash)
     # validate wrangler's activation status
     assert self.wranglers[_new_position.wrangler]
     assert _approval_expires > block.timestamp
@@ -414,6 +422,8 @@ def open_position(
     assert token_transfer
     # Notify wrangler that a position has been opened
     log.PositionUpdateNotification(_new_position.wrangler, _new_position.hash, "status", self.POSITION_STATUS_OPEN)
+    # unlock position_non_reentrant after loan creation
+    self.unlock_position(_new_position.hash)
 
 
 # external functions
@@ -427,8 +437,7 @@ def topup_position(_position_hash: bytes32, _borrow_currency_increment: uint256)
     # confirm position is still active
     assert existing_position.status == self.POSITION_STATUS_OPEN
     # lock position_non_reentrant for topup
-    assert self.position_locks[method_id('topup_position()', bytes32)][_position_hash] == False
-    self.position_locks[method_id('topup_position()', bytes32)][_position_hash] = True
+    self.lock_position(_position_hash)
     # perform topup
     existing_position.borrow_currency_current_value += _borrow_currency_increment
     self.positions[_position_hash] = existing_position
@@ -442,7 +451,7 @@ def topup_position(_position_hash: bytes32, _borrow_currency_increment: uint256)
     # Notify wrangler that a position has been topped up
     log.PositionUpdateNotification(existing_position.wrangler, _position_hash, "borrow_currency_value", self.POSITION_TOPPED_UP)
     # unlock position_non_reentrant for topup
-    self.position_locks[method_id('topup_position()', bytes32)][_position_hash] = False
+    self.unlock_position(_position_hash)
 
     return True
 
@@ -457,8 +466,7 @@ def liquidate_position(_position_hash: bytes32) -> bool:
     # confirm position is still active
     assert existing_position.status == self.POSITION_STATUS_OPEN
     # lock position_non_reentrant for liquidation
-    assert self.position_locks[method_id('liquidate_position()', bytes32)][_position_hash] == False
-    self.position_locks[method_id('liquidate_position()', bytes32)][_position_hash] = True
+    self.lock_position(_position_hash)
     # perform liquidation
     existing_position.status = self.POSITION_STATUS_LIQUIDATED
     self.positions[_position_hash] = existing_position
@@ -472,7 +480,7 @@ def liquidate_position(_position_hash: bytes32) -> bool:
     # Notify wrangler that a position has been liquidated
     log.PositionUpdateNotification(existing_position.wrangler, _position_hash, "status", self.POSITION_STATUS_LIQUIDATED)
     # unlock position_non_reentrant for liquidation
-    self.position_locks[method_id('liquidate_position()', bytes32)][_position_hash] = False
+    self.unlock_position(_position_hash)
 
     return True
 
@@ -487,8 +495,7 @@ def close_position(_position_hash: bytes32) -> bool:
     # confirm position is still active
     assert existing_position.status == self.POSITION_STATUS_OPEN
     # lock position_non_reentrant for closure
-    assert self.position_locks[method_id('close_position()', bytes32)][_position_hash] == False
-    self.position_locks[method_id('close_position()', bytes32)][_position_hash] = True
+    self.lock_position(_position_hash)
     # perform closure
     existing_position.status = self.POSITION_STATUS_CLOSED
     self.positions[_position_hash] = existing_position
@@ -508,8 +515,8 @@ def close_position(_position_hash: bytes32) -> bool:
     assert token_transfer
     # Notify wrangler that a position has been closed
     log.PositionUpdateNotification(existing_position.wrangler, _position_hash, "status", self.POSITION_STATUS_CLOSED)
-    # unlock position_non_reentrant for closure
-    self.position_locks[method_id('close_position()', bytes32)][_position_hash] = False
+    # lock position_non_reentrant for closure
+    self.unlock_position(_position_hash)
 
     return True
 
@@ -562,9 +569,9 @@ def fill_kernel(
     # validate _wrangler is not empty
     assert _kernel.wrangler != ZERO_ADDRESS
     # validate _collateralToken is a contract address
-    assert self.is_token_active(_kernel.borrow_currency_address)
+    assert self.supported_tokens[_kernel.borrow_currency_address]
     # validate _loanToken is a contract address
-    assert self.is_token_active(_kernel.lend_currency_address)
+    assert self.supported_tokens[_kernel.lend_currency_address]
     # validate loan amounts
     assert as_unitless_number(_values[0]) > 0
     assert as_unitless_number(_kernel.lend_currency_offered_value) > 0

@@ -215,12 +215,6 @@ contract("Protocol", function (addresses) {
     )
     let _wrangler_approval_expiry_timestamp = web3.eth.getBlock(web3.eth.blockNumber).timestamp + this.wrangler_approval_duration_in_seconds
     let _wrangler_signature = web3.eth.sign(this.wrangler, this.position_hash)
-    // _wrangler_signature = _wrangler_signature.substr(2)
-    // let vrsWrangler = [
-    //   `${_wrangler_signature.slice(128, 130)}` === '00' ? web3._extend.utils.toBigNumber(27) : web3._extend.utils.toBigNumber(28),
-    //   web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(0, 64)}`),
-    //   web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(64, 128)}`)
-    // ]
     // prepare inputs
     let _is_creator_lender = true;
     // do call
@@ -280,12 +274,6 @@ contract("Protocol", function (addresses) {
     )
     let _wrangler_approval_expiry_timestamp = web3.eth.getBlock(web3.eth.blockNumber).timestamp + this.wrangler_approval_duration_in_seconds
     let _wrangler_signature = web3.eth.sign(this.wrangler, this.position_hash)
-    // _wrangler_signature = _wrangler_signature.substr(2)
-    // let vrsWrangler = [
-    //   `${_wrangler_signature.slice(128, 130)}` === '00' ? web3._extend.utils.toBigNumber(27) : web3._extend.utils.toBigNumber(28),
-    //   web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(0, 64)}`),
-    //   web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(64, 128)}`)
-    // ]
     // prepare inputs
     let _is_creator_lender = true;
     // do call
@@ -345,12 +333,6 @@ contract("Protocol", function (addresses) {
     )
     let _wrangler_approval_expiry_timestamp = web3.eth.getBlock(web3.eth.blockNumber).timestamp + this.wrangler_approval_duration_in_seconds
     let _wrangler_signature = web3.eth.sign(this.wrangler, this.position_hash)
-    // _wrangler_signature = _wrangler_signature.substr(2)
-    // let vrsWrangler = [
-    //   `${_wrangler_signature.slice(128, 130)}` === '00' ? web3._extend.utils.toBigNumber(27) : web3._extend.utils.toBigNumber(28),
-    //   web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(0, 64)}`),
-    //   web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(64, 128)}`)
-    // ]
     // prepare inputs
     let _is_creator_lender = true;
     // do call

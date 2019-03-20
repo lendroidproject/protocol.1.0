@@ -77,8 +77,7 @@ contract("Protocol", function (addresses) {
       this.kernel_expires_at, this.kernel_creator_salt,
       this.kernel_daily_interest_rate, this.kernel_position_duration_in_seconds
     )
-    let _kernel_creator_signature= web3.eth.sign(this.lender, kernel_hash)
-    _kernel_creator_signature = _kernel_creator_signature.substr(2)
+    this.kernel_creator_signature= web3.eth.sign(this.lender, kernel_hash)
     this.kernel_addresses = [
       this.lender, this.ZERO_ADDRESS, this.relayer, this.wrangler, this.BorrowToken.address, this.LendToken.address
     ]
@@ -86,11 +85,11 @@ contract("Protocol", function (addresses) {
       this.kernel_lending_currency_maximum_value,
       this.kernel_relayer_fee, this.kernel_monitoring_fee, this.kernel_rollover_fee, this.kernel_closure_fee
     ]
-    this.vrsCreator = [
-      `${_kernel_creator_signature.slice(128, 130)}` === '00' ? web3._extend.utils.toBigNumber(27) : web3._extend.utils.toBigNumber(28),
-      web3._extend.utils.toBigNumber(`0x${_kernel_creator_signature.slice(0, 64)}`),
-      web3._extend.utils.toBigNumber(`0x${_kernel_creator_signature.slice(64, 128)}`)
-    ]
+    // this.vrsCreator = [
+    //   `${_kernel_creator_signature.slice(128, 130)}` === '00' ? web3._extend.utils.toBigNumber(27) : web3._extend.utils.toBigNumber(28),
+    //   web3._extend.utils.toBigNumber(`0x${_kernel_creator_signature.slice(0, 64)}`),
+    //   web3._extend.utils.toBigNumber(`0x${_kernel_creator_signature.slice(64, 128)}`)
+    // ]
     // Sign position hash as wrangler
     let _nonce = '1';
     position_hash = await this.protocolContract.position_hash(
@@ -107,15 +106,9 @@ contract("Protocol", function (addresses) {
     )
     let _wrangler_approval_expiry_timestamp = web3.eth.getBlock(web3.eth.blockNumber).timestamp + this.wrangler_approval_duration_in_seconds
     let _wrangler_signature = web3.eth.sign(this.wrangler, position_hash)
-    _wrangler_signature = _wrangler_signature.substr(2)
-    let vrsWrangler = [
-      `${_wrangler_signature.slice(128, 130)}` === '00' ? web3._extend.utils.toBigNumber(27) : web3._extend.utils.toBigNumber(28),
-      web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(0, 64)}`),
-      web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(64, 128)}`)
-    ]
     fill_kernel_vrs = [
-      this.vrsCreator,
-      vrsWrangler,
+      this.kernel_creator_signature,
+      _wrangler_signature,
     ]
     // prepare inputs
     let _is_creator_lender = true;
@@ -162,15 +155,9 @@ contract("Protocol", function (addresses) {
     )
     _wrangler_approval_expiry_timestamp = web3.eth.getBlock(web3.eth.blockNumber).timestamp + this.wrangler_approval_duration_in_seconds
     _wrangler_signature = web3.eth.sign(this.wrangler, position_hash)
-    _wrangler_signature = _wrangler_signature.substr(2)
-    vrsWrangler = [
-      `${_wrangler_signature.slice(128, 130)}` === '00' ? web3._extend.utils.toBigNumber(27) : web3._extend.utils.toBigNumber(28),
-      web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(0, 64)}`),
-      web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(64, 128)}`)
-    ]
     fill_kernel_vrs = [
-      this.vrsCreator,
-      vrsWrangler,
+      this.kernel_creator_signature,
+      _wrangler_signature,
     ]
     _is_creator_lender = true
 
@@ -221,15 +208,9 @@ contract("Protocol", function (addresses) {
     )
     _wrangler_approval_expiry_timestamp = web3.eth.getBlock(web3.eth.blockNumber).timestamp + this.wrangler_approval_duration_in_seconds
     _wrangler_signature = web3.eth.sign(this.wrangler, position_hash)
-    _wrangler_signature = _wrangler_signature.substr(2)
-    vrsWrangler = [
-      `${_wrangler_signature.slice(128, 130)}` === '00' ? web3._extend.utils.toBigNumber(27) : web3._extend.utils.toBigNumber(28),
-      web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(0, 64)}`),
-      web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(64, 128)}`)
-    ]
     fill_kernel_vrs = [
-      this.vrsCreator,
-      vrsWrangler,
+      this.kernel_creator_signature,
+      _wrangler_signature,
     ]
     _is_creator_lender = true
 
@@ -280,15 +261,9 @@ contract("Protocol", function (addresses) {
     )
     _wrangler_approval_expiry_timestamp = web3.eth.getBlock(web3.eth.blockNumber).timestamp + this.wrangler_approval_duration_in_seconds
     _wrangler_signature = web3.eth.sign(this.wrangler, position_hash)
-    _wrangler_signature = _wrangler_signature.substr(2)
-    vrsWrangler = [
-      `${_wrangler_signature.slice(128, 130)}` === '00' ? web3._extend.utils.toBigNumber(27) : web3._extend.utils.toBigNumber(28),
-      web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(0, 64)}`),
-      web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(64, 128)}`)
-    ]
     fill_kernel_vrs = [
-      this.vrsCreator,
-      vrsWrangler,
+      this.kernel_creator_signature,
+      _wrangler_signature,
     ]
     _is_creator_lender = true
 
@@ -349,15 +324,9 @@ contract("Protocol", function (addresses) {
     )
     _wrangler_approval_expiry_timestamp = web3.eth.getBlock(web3.eth.blockNumber).timestamp + this.wrangler_approval_duration_in_seconds
     _wrangler_signature = web3.eth.sign(this.wrangler, position_hash)
-    _wrangler_signature = _wrangler_signature.substr(2)
-    vrsWrangler = [
-      `${_wrangler_signature.slice(128, 130)}` === '00' ? web3._extend.utils.toBigNumber(27) : web3._extend.utils.toBigNumber(28),
-      web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(0, 64)}`),
-      web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(64, 128)}`)
-    ]
     fill_kernel_vrs = [
-      this.vrsCreator,
-      vrsWrangler,
+      this.kernel_creator_signature,
+      _wrangler_signature,
     ]
     _is_creator_lender = true
 
@@ -411,15 +380,9 @@ contract("Protocol", function (addresses) {
     )
     _wrangler_approval_expiry_timestamp = web3.eth.getBlock(web3.eth.blockNumber).timestamp + this.wrangler_approval_duration_in_seconds
     _wrangler_signature = web3.eth.sign(this.wrangler, position_hash)
-    _wrangler_signature = _wrangler_signature.substr(2)
-    vrsWrangler = [
-      `${_wrangler_signature.slice(128, 130)}` === '00' ? web3._extend.utils.toBigNumber(27) : web3._extend.utils.toBigNumber(28),
-      web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(0, 64)}`),
-      web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(64, 128)}`)
-    ]
     fill_kernel_vrs = [
-      this.vrsCreator,
-      vrsWrangler,
+      this.kernel_creator_signature,
+      _wrangler_signature,
     ]
     _is_creator_lender = true
 
@@ -468,15 +431,9 @@ contract("Protocol", function (addresses) {
     )
     _wrangler_approval_expiry_timestamp = web3.eth.getBlock(web3.eth.blockNumber).timestamp + this.wrangler_approval_duration_in_seconds
     _wrangler_signature = web3.eth.sign(this.wrangler, position_hash)
-    _wrangler_signature = _wrangler_signature.substr(2)
-    vrsWrangler = [
-      `${_wrangler_signature.slice(128, 130)}` === '00' ? web3._extend.utils.toBigNumber(27) : web3._extend.utils.toBigNumber(28),
-      web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(0, 64)}`),
-      web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(64, 128)}`)
-    ]
     fill_kernel_vrs = [
-      this.vrsCreator,
-      vrsWrangler,
+      this.kernel_creator_signature,
+      _wrangler_signature,
     ]
     _is_creator_lender = true
 
@@ -550,15 +507,9 @@ contract("Protocol", function (addresses) {
     )
     _wrangler_approval_expiry_timestamp = web3.eth.getBlock(web3.eth.blockNumber).timestamp + this.wrangler_approval_duration_in_seconds
     _wrangler_signature = web3.eth.sign(this.wrangler, position_hash)
-    _wrangler_signature = _wrangler_signature.substr(2)
-    vrsWrangler = [
-      `${_wrangler_signature.slice(128, 130)}` === '00' ? web3._extend.utils.toBigNumber(27) : web3._extend.utils.toBigNumber(28),
-      web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(0, 64)}`),
-      web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(64, 128)}`)
-    ]
     fill_kernel_vrs = [
-      this.vrsCreator,
-      vrsWrangler,
+      this.kernel_creator_signature,
+      _wrangler_signature,
     ]
     _is_creator_lender = true
 

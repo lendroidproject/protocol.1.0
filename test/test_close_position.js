@@ -76,7 +76,6 @@ contract("Protocol", function (addresses) {
       this.kernel_daily_interest_rate, this.kernel_position_duration_in_seconds
     )
     let _kernel_creator_signature = web3.eth.sign(this.lender, kernel_hash)
-    _kernel_creator_signature = _kernel_creator_signature.substr(2)
     // Sign position hash as wrangler
     let _nonce = '1';
     this.position_hash = await this.protocolContract.position_hash(
@@ -93,7 +92,6 @@ contract("Protocol", function (addresses) {
     )
     let _wrangler_approval_expiry_timestamp = web3.eth.getBlock(web3.eth.blockNumber).timestamp + this.wrangler_approval_duration_in_seconds
     let _wrangler_signature = web3.eth.sign(this.wrangler, this.position_hash)
-    _wrangler_signature = _wrangler_signature.substr(2)
     // prepare inputs
     let _is_creator_lender = true;
     // do call
@@ -114,18 +112,8 @@ contract("Protocol", function (addresses) {
       ],
       this.kernel_position_duration_in_seconds,
       this.kernel_creator_salt,
-      [
-        [
-          `${_kernel_creator_signature.slice(128, 130)}` === '00' ? web3._extend.utils.toBigNumber(27) : web3._extend.utils.toBigNumber(28),
-          web3._extend.utils.toBigNumber(`0x${_kernel_creator_signature.slice(0, 64)}`),
-          web3._extend.utils.toBigNumber(`0x${_kernel_creator_signature.slice(64, 128)}`)
-        ],
-        [
-          `${_wrangler_signature.slice(128, 130)}` === '00' ? web3._extend.utils.toBigNumber(27) : web3._extend.utils.toBigNumber(28),
-          web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(0, 64)}`),
-          web3._extend.utils.toBigNumber(`0x${_wrangler_signature.slice(64, 128)}`)
-        ],
-      ],
+      _kernel_creator_signature,
+      _wrangler_signature,
       {from: addresses[0]}
     );
     await mineTx(tx);
