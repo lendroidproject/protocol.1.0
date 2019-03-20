@@ -142,12 +142,6 @@ def is_signer(_prover: address, _hash: bytes32, _sig: bytes[65]) -> bool:
 
 
 @private
-@constant
-def is_contract(_address: address) -> bool:
-    return (_address != ZERO_ADDRESS) and (_address.codesize > 0)
-
-
-@private
 def lock_position(_position_hash: bytes32):
     assert self.nonreentrant_locks[_position_hash] == False
     self.nonreentrant_locks[_position_hash] = True
@@ -295,7 +289,7 @@ def set_wrangler_status(_address: address, _is_active: bool) -> bool:
 @public
 def set_token_support(_address: address, _is_active: bool) -> bool:
     assert msg.sender == self.owner
-    assert self.is_contract(_address)
+    assert _address.is_contract
     self.supported_tokens[_address] = _is_active
     log.ProtocolParameterUpdateNotification("token_support", _address, convert(_is_active, uint256))
     return True
