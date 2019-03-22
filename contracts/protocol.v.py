@@ -200,6 +200,7 @@ def kernel_hash(
         )
     )
 
+
 @public
 @constant
 def position_hash(
@@ -380,20 +381,23 @@ def open_position(
             _values, _lend_currency_owed_value, _nonce
         )
     })
-    # lock position_non_reentrant during loan creation
+    # lock position_non_reentrant before loan creation
     self.lock_position(_new_position.hash)
     # validate wrangler's activation status
     assert self.wranglers[_new_position.wrangler]
+    # validate wrangler's approval expiry
     assert _approval_expires > block.timestamp
+    # validate wrangler's nonce
     assert _nonce == self.wrangler_nonces[_new_position.wrangler][_kernel_creator] + 1
     # increment wrangler's nonce for kernel creator
     self.wrangler_nonces[_new_position.wrangler][_kernel_creator] += 1
     # validate wrangler's signature
     assert self.is_signer(_new_position.wrangler, _new_position.hash, _sig_data)
-    # update position index and record position
+    # update position index
     self.position_index[self.last_position_index] = _new_position.hash
     self.last_position_index += 1
     self.positions[_new_position.hash] = _new_position
+    # record position
     self.record_position(_addresses[0], _addresses[1], _new_position.hash)
     # transfer borrow_currency_current_value from borrower to this address
     token_transfer: bool = ERC20(_new_position.borrow_currency_address).transferFrom(
@@ -416,7 +420,7 @@ def open_position(
         _new_position.monitoring_fee
     )
     assert token_transfer
-    # Notify wrangler that a position has been opened
+    # notify wrangler that a position has been opened
     log.PositionUpdateNotification(_new_position.wrangler, _new_position.hash, "status", self.POSITION_STATUS_OPEN)
     # unlock position_non_reentrant after loan creation
     self.unlock_position(_new_position.hash)
@@ -432,7 +436,7 @@ def topup_position(_position_hash: bytes32, _borrow_currency_increment: uint256)
     assert existing_position.expires_at >= block.timestamp
     # confirm position is still active
     assert existing_position.status == self.POSITION_STATUS_OPEN
-    # lock position_non_reentrant for topup
+    # lock position_non_reentrant before topup
     self.lock_position(_position_hash)
     # perform topup
     existing_position.borrow_currency_current_value += _borrow_currency_increment
@@ -446,7 +450,7 @@ def topup_position(_position_hash: bytes32, _borrow_currency_increment: uint256)
     assert token_transfer
     # Notify wrangler that a position has been topped up
     log.PositionUpdateNotification(existing_position.wrangler, _position_hash, "borrow_currency_value", self.POSITION_TOPPED_UP)
-    # unlock position_non_reentrant for topup
+    # unlock position_non_reentrant after topup
     self.unlock_position(_position_hash)
 
     return True
@@ -461,7 +465,7 @@ def liquidate_position(_position_hash: bytes32) -> bool:
     assert ((msg.sender == existing_position.wrangler) or (msg.sender == existing_position.lender))
     # confirm position is still active
     assert existing_position.status == self.POSITION_STATUS_OPEN
-    # lock position_non_reentrant for liquidation
+    # lock position_non_reentrant before liquidation
     self.lock_position(_position_hash)
     # perform liquidation
     existing_position.status = self.POSITION_STATUS_LIQUIDATED
@@ -473,9 +477,9 @@ def liquidate_position(_position_hash: bytes32) -> bool:
         existing_position.borrow_currency_current_value
     )
     assert token_transfer
-    # Notify wrangler that a position has been liquidated
+    # notify wrangler that a position has been liquidated
     log.PositionUpdateNotification(existing_position.wrangler, _position_hash, "status", self.POSITION_STATUS_LIQUIDATED)
-    # unlock position_non_reentrant for liquidation
+    # unlock position_non_reentrant after liquidation
     self.unlock_position(_position_hash)
 
     return True
@@ -490,7 +494,7 @@ def close_position(_position_hash: bytes32) -> bool:
     assert existing_position.expires_at >= block.timestamp
     # confirm position is still active
     assert existing_position.status == self.POSITION_STATUS_OPEN
-    # lock position_non_reentrant for closure
+    # lock position_non_reentrant before closure
     self.lock_position(_position_hash)
     # perform closure
     existing_position.status = self.POSITION_STATUS_CLOSED
@@ -511,7 +515,7 @@ def close_position(_position_hash: bytes32) -> bool:
     assert token_transfer
     # Notify wrangler that a position has been closed
     log.PositionUpdateNotification(existing_position.wrangler, _position_hash, "status", self.POSITION_STATUS_CLOSED)
-    # lock position_non_reentrant for closure
+    # unlock position_non_reentrant after closure
     self.unlock_position(_position_hash)
 
     return True
@@ -638,12 +642,12 @@ def cancel_kernel(
         [_kernel.lend_currency_offered_value,
         _kernel.relayer_fee, _kernel.monitoring_fee, _kernel.rollover_fee, _kernel.closure_fee],
         _kernel.expires_at, _kernel.salt, _kernel.daily_interest_rate, _kernel.position_duration_in_seconds)
-    # verify sender is kernel signer
+    # verify sender is kernel creator
     assert self.is_signer(msg.sender, _k_hash, _sig_data)
     # verify sanity of offered and cancellation amounts
     assert as_unitless_number(_kernel.lend_currency_offered_value) > 0
     assert as_unitless_number(_lend_currency_cancel_value) > 0
-    # verify cancellation amount does not exceed remaining laon amount to be filled
+    # verify cancellation amount does not exceed remaining loan amount to be filled
     assert as_unitless_number(_kernel.lend_currency_offered_value) - self.filled_or_cancelled_loan_amount(_k_hash) >= as_unitless_number(_lend_currency_cancel_value)
     self.kernels_cancelled[_k_hash] += _lend_currency_cancel_value
 
