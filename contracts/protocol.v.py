@@ -141,18 +141,6 @@ def is_signer(_prover: address, _hash: bytes32, _sig: bytes[65]) -> bool:
         return _prover == self.ecrecover_from_signature(sha3(concat(sign_prefix, _hash)), _sig)
 
 
-@private
-def lock_position(_position_hash: bytes32):
-    assert self.nonreentrant_locks[_position_hash] == False
-    self.nonreentrant_locks[_position_hash] = True
-
-
-@private
-def unlock_position(_position_hash: bytes32):
-    assert self.nonreentrant_locks[_position_hash] == True
-    self.nonreentrant_locks[_position_hash] = False
-
-
 @public
 @constant
 def can_borrow(_address: address) -> bool:
@@ -297,6 +285,18 @@ def set_token_support(_address: address, _is_active: bool) -> bool:
 
 # internal functions
 @private
+def lock_position(_position_hash: bytes32):
+    assert self.nonreentrant_locks[_position_hash] == False
+    self.nonreentrant_locks[_position_hash] = True
+
+
+@private
+def unlock_position(_position_hash: bytes32):
+    assert self.nonreentrant_locks[_position_hash] == True
+    self.nonreentrant_locks[_position_hash] = False
+
+
+@private
 def record_position(_lender: address, _borrower: address, _position_hash: bytes32):
     assert self.can_borrow(_borrower)
     assert self.can_lend(_lender)
@@ -334,7 +334,7 @@ def remove_position(_position_hash: bytes32):
     self.lend_positions_count[_lender] -= 1
 
 
-@private
+@public
 def open_position(
         _kernel_creator: address,
         _addresses: address[6],
@@ -348,6 +348,8 @@ def open_position(
         _sig_data: bytes[65]
         # v, r, s of wrangler
     ):
+    # this is a `fake internal` function for now!
+    assert msg.sender == self
     # calculate owed value
     _lend_currency_owed_value: uint256 = self.owed_value(_values[6], _kernel_daily_interest_rate, _position_duration_in_seconds)
     # create position from struct
