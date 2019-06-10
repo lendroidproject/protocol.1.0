@@ -26,9 +26,9 @@ contract("Protocol", function (addresses) {
     this.wrangler = addresses[4];
     //// kernel terms
     // uint256 values
-    this.kernel_daily_interest_rate = web3._extend.utils.toWei('0.08', 'ether')
+    this.kernel_daily_interest_rate = web3._extend.utils.toWei('0.000001', 'ether')
     // timedelta values
-    this.kernel_position_duration_in_seconds = 2 * 60 * 60 * 24
+    this.kernel_position_duration_in_seconds = 90 * 60 * 60 * 24
     this.wrangler_approval_duration_in_seconds = 5 * 60
     // wei values
     this.kernel_lending_currency_maximum_value = web3._extend.utils.toWei('40', 'ether')
@@ -41,9 +41,13 @@ contract("Protocol", function (addresses) {
     // bytes32 values
     this.kernel_creator_salt = `0x${saltGenerator()}`
     // position terms
-    this.position_lending_currency_fill_value = web3._extend.utils.toWei('1', 'ether')
-    this.position_borrow_currency_fill_value = web3._extend.utils.toWei('0.1', 'ether')
-    this.position_lending_currency_owed_value = web3._extend.utils.toWei('1.0016', 'ether')
+    this.position_lending_currency_fill_value = web3._extend.utils.toWei('10', 'ether')
+    this.position_borrow_currency_fill_value = web3._extend.utils.toWei('1.1', 'ether')
+    this.position_lending_currency_owed_value = await this.protocolContract.owed_value(
+      this.position_lending_currency_fill_value,
+      this.kernel_daily_interest_rate,
+      this.kernel_position_duration_in_seconds
+    )
   });
 
 
@@ -55,12 +59,12 @@ contract("Protocol", function (addresses) {
     tx = this.protocolToken.approve(this.protocolContract.address, web3._extend.utils.toWei('100', 'ether'), {from: this.lender})
     await mineTx(tx);
     // set allowance from lender to protocol contract for loan transfer
-    tx = this.LendToken.mint(this.lender, web3._extend.utils.toWei('40', 'ether'), {from: addresses[0]})
+    tx = this.LendToken.mint(this.lender, web3._extend.utils.toWei('100', 'ether'), {from: addresses[0]})
     await mineTx(tx);
     tx = this.LendToken.approve(this.protocolContract.address, web3._extend.utils.toWei('40', 'ether'), {from: this.lender})
     await mineTx(tx);
     // set allowance from borrower to protocol contract for collateral transfer
-    tx = this.BorrowToken.mint(this.borrower, web3._extend.utils.toWei('5', 'ether'), {from: addresses[0]})
+    tx = this.BorrowToken.mint(this.borrower, web3._extend.utils.toWei('10', 'ether'), {from: addresses[0]})
     await mineTx(tx);
     tx = this.BorrowToken.approve(this.protocolContract.address, web3._extend.utils.toWei('5', 'ether'), {from: this.borrower})
     await mineTx(tx);
