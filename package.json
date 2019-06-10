@@ -7,13 +7,11 @@
     "test": "test"
   },
   "dependencies": {
-    "handlebars": ">=4.1.2",
-    "js-yaml": ">=3.13.1",
     "ganache-cli": "^6.4.1",
     "openzeppelin-solidity": "^2.0.0",
-    "solidity-coverage": "^0.5.11",
     "truffle": "^4.1.14",
-    "truper": "0.0.2"
+    "truper": "0.0.2",
+    "web3": "^0.20.7"
   },
   "scripts": {
     "test": "./node_modules/.bin/truffle test",
