@@ -45,8 +45,14 @@ Please use semantic Git commits: https://seesparkbox.com/foundry/semantic_commit
 
   `(vyper-venv) $ truper`
 
-* Open a third terminal (Terminal 3) and run the tests
+* Open a third terminal (Terminal 3) and run the tests using Truffle test suite
 
   `truffle test`
+
+* To run tests using the Python test suite
+
+    `pip install -r requirements.txt`
+
+    `pytest`
 
 _Note_: When the development / testing session ends, deactivate the virtualenv on Terminal 2: `(vyper-venv) $ deactivate`

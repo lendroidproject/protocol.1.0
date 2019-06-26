@@ -5,3 +5,4 @@
 /coverage
 coverage.json
 .solcover.js
+__pycache__/
