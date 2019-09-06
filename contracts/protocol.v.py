@@ -1,7 +1,6 @@
 # Vyper version of the Lendroid protocol v1
-# THIS CONTRACT IS BEING AUDITED!
-# Solidity code available at:
-# https://github.com/lendroidproject/protocol.1.0
+# Audit report available at:
+# https://certificate.quantstamp.com/view/lendroid-protocol-version-1-0
 
 
 # struct representing a kernel
