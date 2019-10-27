@@ -1,6 +1,5 @@
 // helpers
 const mineTx = require("./helpers/mineTx.js");
-const delay = require("./helpers/delay.js");
 const saltGenerator = require("./helpers/saltGenerator.js");
 const blockTimestamp = require("./helpers/blockTimestamp");
 // contracts
