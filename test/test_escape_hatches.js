@@ -7,7 +7,7 @@ var ERC20 = artifacts.require("ERC20.vyper"),
 const Web3 = require("web3");
 const web3 = new Web3(new Web3.providers.HttpProvider("http://127.0.0.1:8545"));
 
-contract("Protocol", function(addresses) {
+contract("Protocol - escape_hatch_token", function(addresses) {
   beforeEach(async function() {
     this.protocolToken = await ERC20.new("Lendroid Support Token", "LST", 18, 12000000000);
     this.LendToken = await ERC20.new("Test Lend Token", "TLT", 18, 1000000000);

@@ -2,7 +2,7 @@
 var ERC20 = artifacts.require("ERC20.vyper"),
   Protocol = artifacts.require("protocol.vyper");
 
-contract("Protocol", function(addresses) {
+contract("Protocol - settings : [set_wrangler_status, set_position_threshold]", function(addresses) {
   beforeEach(async function() {
     this.protocolToken = await ERC20.new("Lendroid Support Token", "LST", 18, 12000000000);
     this.LendToken = await ERC20.new("Test Lend Token", "TLT", 18, 1000000000);

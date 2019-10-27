@@ -9,7 +9,7 @@ var ERC20 = artifacts.require("ERC20.vyper"),
 const Web3 = require("web3");
 const web3 = new Web3(new Web3.providers.HttpProvider("http://127.0.0.1:8545"));
 
-contract("Protocol", function(addresses) {
+contract("Protocol - multiple position_hash", function(addresses) {
   beforeEach(async function() {
     this.ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
     this.EMPTY_BYTES32 = "0x0000000000000000000000000000000000000000000000000000000000000000";
