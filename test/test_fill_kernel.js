@@ -26,7 +26,7 @@ contract("Protocol - fill_kernel", function(addresses) {
     this.wrangler = addresses[4];
     //// kernel terms
     // uint256 values
-    this.kernel_daily_interest_rate = web3.utils.toWei("0.000001", "ether");
+    this.kernel_daily_interest_rate = 10;
     // timedelta values
     this.kernel_position_duration_in_seconds = 90 * 60 * 60 * 24;
     this.wrangler_approval_duration_in_seconds = 5 * 60;
