@@ -12,7 +12,7 @@ const web3 = new Web3(new Web3.providers.HttpProvider("http://127.0.0.1:8545"));
 
 contract("Protocol", function(addresses) {
   beforeEach(async function() {
-    this.ZERO_ADDRESS = 0x0000000000000000000000000000000000000000;
+    this.ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
     this.protocolToken = await ERC20.new("Lendroid Support Token", "LST", 18, 12000000000);
     this.LendToken = await ERC20.new("Test Lend Token", "TLT", 18, 1000000000);
     this.BorrowToken = await ERC20.new("Test Borrow Token", "TBT", 18, 1000000000);
@@ -37,11 +37,6 @@ contract("Protocol", function(addresses) {
     this.kernel_monitoring_fee = web3.utils.toWei("10", "ether");
     this.kernel_rollover_fee = web3.utils.toWei("10", "ether");
     this.kernel_closure_fee = web3.utils.toWei("10", "ether");
-    // timestamp values
-    this.kernel_expires_at = (await blockTimestamp(web3)) + 86400 * 2;
-    console.log(this.kernel_expires_at);
-    // bytes32 values
-    this.kernel_creator_salt = `0x${saltGenerator()}`;
     // position terms
     this.position_lending_currency_fill_value = web3.utils.toWei("30", "ether");
     this.position_borrow_currency_fill_value = web3.utils.toWei("3", "ether");
@@ -68,22 +63,11 @@ contract("Protocol", function(addresses) {
     // Approve wrangler as protocol owner
     tx = this.protocolContract.set_wrangler_status(this.wrangler, true, { from: addresses[0] });
     await mineTx(tx);
-    // Sign kernel hash as lender
-    let kernel_hash = await this.protocolContract.kernel_hash(
-      [this.lender, this.ZERO_ADDRESS, this.relayer, this.wrangler, this.BorrowToken.address, this.LendToken.address],
-      [
-        this.kernel_lending_currency_maximum_value,
-        this.kernel_relayer_fee,
-        this.kernel_monitoring_fee,
-        this.kernel_rollover_fee,
-        this.kernel_closure_fee,
-      ],
-      this.kernel_expires_at,
-      this.kernel_creator_salt,
-      this.kernel_daily_interest_rate,
-      this.kernel_position_duration_in_seconds
-    );
-    this.kernel_creator_signature = web3.eth.sign(kernel_hash, this.lender);
+    // timestamp values
+    this.kernel_expires_at = (await blockTimestamp(web3)) + 86400 * 2;
+    // bytes32 values
+    this.kernel_creator_salt = `0x${saltGenerator()}`;
+    // kernel addresses - lender
     this.kernel_addresses = [
       this.lender,
       this.ZERO_ADDRESS,
@@ -92,6 +76,7 @@ contract("Protocol", function(addresses) {
       this.BorrowToken.address,
       this.LendToken.address,
     ];
+    // kernel values - lender
     this.kernel_values = [
       this.kernel_lending_currency_maximum_value,
       this.kernel_relayer_fee,
@@ -99,6 +84,17 @@ contract("Protocol", function(addresses) {
       this.kernel_rollover_fee,
       this.kernel_closure_fee,
     ];
+    // Sign kernel hash as lender
+    let kernel_hash = await this.protocolContract.kernel_hash(
+      this.kernel_addresses,
+      this.kernel_values,
+      this.kernel_expires_at,
+      this.kernel_creator_salt,
+      this.kernel_daily_interest_rate,
+      this.kernel_position_duration_in_seconds,
+      { from: this.lender }
+    );
+    this.kernel_creator_signature = await web3.eth.sign(kernel_hash, this.lender);
   });
 
   it("cancel_kernel should be callable only by creator", async function() {
@@ -222,7 +218,7 @@ contract("Protocol", function(addresses) {
       this.kernel_daily_interest_rate,
       this.kernel_position_duration_in_seconds
     );
-    this.kernel_creator_signature = web3.eth.sign(kernel_hash, this.lender);
+    this.kernel_creator_signature = await web3.eth.sign(kernel_hash, this.lender);
     let errr = false;
     try {
       await this.protocolContract.cancel_kernel(
@@ -268,7 +264,7 @@ contract("Protocol", function(addresses) {
       _nonce
     );
     let _wrangler_approval_expiry_timestamp = (await blockTimestamp(web3)) + this.wrangler_approval_duration_in_seconds;
-    let _wrangler_signature = web3.eth.sign(this.position_hash, this.wrangler);
+    let _wrangler_signature = await web3.eth.sign(this.position_hash, this.wrangler);
     // prepare inputs
     let _is_creator_lender = true;
     // do call
@@ -341,7 +337,7 @@ contract("Protocol", function(addresses) {
       _nonce
     );
     let _wrangler_approval_expiry_timestamp = (await blockTimestamp(web3)) + this.wrangler_approval_duration_in_seconds;
-    let _wrangler_signature = web3.eth.sign(this.position_hash, this.wrangler);
+    let _wrangler_signature = await web3.eth.sign(this.position_hash, this.wrangler);
     // prepare inputs
     let _is_creator_lender = true;
     // do call
@@ -414,7 +410,7 @@ contract("Protocol", function(addresses) {
       _nonce
     );
     let _wrangler_approval_expiry_timestamp = (await blockTimestamp(web3)) + this.wrangler_approval_duration_in_seconds;
-    let _wrangler_signature = web3.eth.sign(this.position_hash, this.wrangler);
+    let _wrangler_signature = await web3.eth.sign(this.position_hash, this.wrangler);
     // prepare inputs
     let _is_creator_lender = true;
     // do call
