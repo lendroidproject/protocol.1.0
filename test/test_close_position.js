@@ -107,8 +107,7 @@ contract("Protocol", function(addresses) {
       this.position_lending_currency_owed_value,
       _nonce
     );
-    let _wrangler_approval_expiry_timestamp =
-      (await blockTimestamp(web3)) + this.wrangler_approval_duration_in_seconds;
+    let _wrangler_approval_expiry_timestamp = (await blockTimestamp(web3)) + this.wrangler_approval_duration_in_seconds;
     let _wrangler_signature = await web3.eth.sign(this.position_hash, this.wrangler);
     // prepare inputs
     let _is_creator_lender = true;
@@ -184,17 +183,20 @@ contract("Protocol", function(addresses) {
   it("close_position should not be callable by borrower after position has expired", async function() {
     console.log(`Position expiry timestamp: ${this.position[8].toNumber()}`);
     while (!((await blockTimestamp(web3)) > this.position[8].toNumber())) {
-      web3.currentProvider.send({
-        jsonrpc: "2.0",
-        method: "evm_mine",
-        id: new Date().getTime(),
-      }, (err, result) => {
-        if (err) return console.error(err);
-        console.log(result);
-      });
+      web3.currentProvider.send(
+        {
+          jsonrpc: "2.0",
+          method: "evm_mine",
+          id: new Date().getTime(),
+        },
+        (err, result) => {
+          if (err) return console.error(err);
+          console.log(result);
+        }
+      );
       await delay(1000);
     }
-    console.log(`Current blocktimestamp: ${(await blockTimestamp(web3))}`);
+    console.log(`Current blocktimestamp: ${await blockTimestamp(web3)}`);
     let errr = false;
     try {
       await this.protocolContract.close_position(this.position_hash, { from: this.borrower });

@@ -12,7 +12,7 @@ const web3 = new Web3(new Web3.providers.HttpProvider("http://127.0.0.1:8545"));
 
 contract("Protocol", function(addresses) {
   beforeEach(async function() {
-    this.ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+    this.ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
     this.protocolToken = await ERC20.new("Lendroid Support Token", "LST", 18, 12000000000);
     this.LendToken = await ERC20.new("Test Lend Token", "TLT", 18, 1000000000);
     this.BorrowToken = await ERC20.new("Test Borrow Token", "TBT", 18, 1000000000);
@@ -159,14 +159,17 @@ contract("Protocol", function(addresses) {
   it("liquidate_position should be callable by lender", async function() {
     console.log(`Position expiry timestamp: ${this.position[8].toNumber()}`);
     while ((await blockTimestamp(web3)) <= this.position[8].toNumber()) {
-      web3.currentProvider.send({
-        jsonrpc: "2.0",
-        method: "evm_mine",
-        id: new Date().getTime(),
-      }, (err, result) => {
-        if (err) return console.error(err);
-        console.log(result);
-      });
+      web3.currentProvider.send(
+        {
+          jsonrpc: "2.0",
+          method: "evm_mine",
+          id: new Date().getTime(),
+        },
+        (err, result) => {
+          if (err) return console.error(err);
+          console.log(result);
+        }
+      );
       await delay(5001);
     }
     console.log(`Current blocktimestamp: ${await blockTimestamp(web3)}`);
@@ -182,14 +185,17 @@ contract("Protocol", function(addresses) {
   it("liquidate_position should be callable by wrangler", async function() {
     console.log(`Position expiry timestamp: ${this.position[8].toNumber()}`);
     while ((await blockTimestamp(web3)) <= this.position[8].toNumber()) {
-      web3.currentProvider.send({
-        jsonrpc: "2.0",
-        method: "evm_mine",
-        id: new Date().getTime(),
-      }, (err, result) => {
-        if (err) return console.error(err);
-        console.log(result);
-      });
+      web3.currentProvider.send(
+        {
+          jsonrpc: "2.0",
+          method: "evm_mine",
+          id: new Date().getTime(),
+        },
+        (err, result) => {
+          if (err) return console.error(err);
+          console.log(result);
+        }
+      );
       await delay(5001);
     }
     console.log(`Current blocktimestamp: ${await blockTimestamp(web3)}`);
@@ -205,14 +211,17 @@ contract("Protocol", function(addresses) {
   it("liquidate_position should not be callable by borrower", async function() {
     console.log(`Position expiry timestamp: ${this.position[8].toNumber()}`);
     while ((await blockTimestamp(web3)) <= this.position[8].toNumber()) {
-      web3.currentProvider.send({
-        jsonrpc: "2.0",
-        method: "evm_mine",
-        id: new Date().getTime(),
-      }, (err, result) => {
-        if (err) return console.error(err);
-        console.log(result);
-      });
+      web3.currentProvider.send(
+        {
+          jsonrpc: "2.0",
+          method: "evm_mine",
+          id: new Date().getTime(),
+        },
+        (err, result) => {
+          if (err) return console.error(err);
+          console.log(result);
+        }
+      );
       await delay(5001);
     }
     console.log(`Current blocktimestamp: ${await blockTimestamp(web3)}`);
