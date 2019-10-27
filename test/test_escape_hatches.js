@@ -53,7 +53,7 @@ contract("Protocol", function (addresses) {
     let maliciousToken = await ERC20.new("Test Yet Another Token", "TYT", 18, 2, {from: maliciousUserAddress});
     let tokenBalance = await maliciousToken.balanceOf(maliciousUserAddress)
     assert.isTrue(tokenBalance.toString() === "2000000000000000000", `maliciousUserAddress should have a token balance of 2 TYT`)
-    tx = maliciousToken.transfer(this.protocolContract.address, web3._extend.utils.toWei('2', 'ether'), {from: maliciousUserAddress})
+    tx = maliciousToken.transfer(this.protocolContract.address, web3.utils.toWei('2', 'ether'), {from: maliciousUserAddress})
     await mineTx(tx);
     tokenBalance = await maliciousToken.balanceOf(maliciousUserAddress)
     assert.isTrue(tokenBalance.toString() === "0", `maliciousUserAddress should have a token balance of 0 TYT`)

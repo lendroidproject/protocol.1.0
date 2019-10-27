@@ -34,33 +34,33 @@ contract("Protocol", function (addresses) {
     this.kernel_position_duration_in_seconds = 5
     this.wrangler_approval_duration_in_seconds = 5 * 60
     // wei values
-    this.kernel_lending_currency_maximum_value = web3._extend.utils.toWei('40', 'ether')
-    this.kernel_relayer_fee = web3._extend.utils.toWei('10', 'ether')
-    this.kernel_monitoring_fee = web3._extend.utils.toWei('10', 'ether')
-    this.kernel_rollover_fee = web3._extend.utils.toWei('10', 'ether')
-    this.kernel_closure_fee = web3._extend.utils.toWei('10', 'ether')
+    this.kernel_lending_currency_maximum_value = web3.utils.toWei('40', 'ether')
+    this.kernel_relayer_fee = web3.utils.toWei('10', 'ether')
+    this.kernel_monitoring_fee = web3.utils.toWei('10', 'ether')
+    this.kernel_rollover_fee = web3.utils.toWei('10', 'ether')
+    this.kernel_closure_fee = web3.utils.toWei('10', 'ether')
     // timestamp values
     this.kernel_expires_at = web3.eth.getBlock(web3.eth.blockNumber).timestamp + 86400*2
     // bytes32 values
     this.kernel_creator_salt = `0x${saltGenerator()}`
     // position terms
-    let position_lending_currency_fill_value = web3._extend.utils.toWei('30', 'ether')
-    let position_borrow_currency_fill_value = web3._extend.utils.toWei('3', 'ether')
-    let position_lending_currency_owed_value = web3._extend.utils.toWei('30', 'ether')
+    let position_lending_currency_fill_value = web3.utils.toWei('30', 'ether')
+    let position_borrow_currency_fill_value = web3.utils.toWei('3', 'ether')
+    let position_lending_currency_owed_value = web3.utils.toWei('30', 'ether')
     // open position
-    tx = this.protocolToken.mint(this.lender, web3._extend.utils.toWei('100', 'ether'), {from: addresses[0]})
+    tx = this.protocolToken.mint(this.lender, web3.utils.toWei('100', 'ether'), {from: addresses[0]})
     await mineTx(tx);
-    tx = this.protocolToken.approve(this.protocolContract.address, web3._extend.utils.toWei('100', 'ether'), {from: this.lender})
+    tx = this.protocolToken.approve(this.protocolContract.address, web3.utils.toWei('100', 'ether'), {from: this.lender})
     await mineTx(tx);
     // set allowance from lender to protocol contract for loan transfer
-    tx = this.LendToken.mint(this.lender, web3._extend.utils.toWei('40', 'ether'), {from: addresses[0]})
+    tx = this.LendToken.mint(this.lender, web3.utils.toWei('40', 'ether'), {from: addresses[0]})
     await mineTx(tx);
-    tx = this.LendToken.approve(this.protocolContract.address, web3._extend.utils.toWei('40', 'ether'), {from: this.lender})
+    tx = this.LendToken.approve(this.protocolContract.address, web3.utils.toWei('40', 'ether'), {from: this.lender})
     await mineTx(tx);
     // set allowance from borrower to protocol contract for collateral transfer
-    tx = this.BorrowToken.mint(this.borrower, web3._extend.utils.toWei('5', 'ether'), {from: addresses[0]})
+    tx = this.BorrowToken.mint(this.borrower, web3.utils.toWei('5', 'ether'), {from: addresses[0]})
     await mineTx(tx);
-    tx = this.BorrowToken.approve(this.protocolContract.address, web3._extend.utils.toWei('5', 'ether'), {from: this.borrower})
+    tx = this.BorrowToken.approve(this.protocolContract.address, web3.utils.toWei('5', 'ether'), {from: this.borrower})
     await mineTx(tx);
     // Approve wrangler as protocol owner
     tx = this.protocolContract.set_wrangler_status(this.wrangler, true, {from:addresses[0]});
@@ -129,10 +129,10 @@ contract("Protocol", function (addresses) {
   });
 
   it("should fill the same kernel with two different positions each with a different nonce and fill_value within available kernel lend currency value", async function() {
-    position_borrow_currency_fill_value = web3._extend.utils.toWei('1', 'ether')
+    position_borrow_currency_fill_value = web3.utils.toWei('1', 'ether')
     _nonce = '2'
-    position_lending_currency_fill_value = web3._extend.utils.toWei('10', 'ether')
-    position_lending_currency_owed_value = web3._extend.utils.toWei('10', 'ether')
+    position_lending_currency_fill_value = web3.utils.toWei('10', 'ether')
+    position_lending_currency_owed_value = web3.utils.toWei('10', 'ether')
     position_hash = await this.protocolContract.position_hash(
       [
         this.lender, this.lender, this.borrower, this.relayer, this.wrangler, this.BorrowToken.address, this.LendToken.address
@@ -179,10 +179,10 @@ contract("Protocol", function (addresses) {
   });
 
   it("should not fill the same kernel with two different positions each with the same nonce and fill_value within available kernel lend currency value", async function() {
-    position_borrow_currency_fill_value = web3._extend.utils.toWei('1', 'ether')
+    position_borrow_currency_fill_value = web3.utils.toWei('1', 'ether')
     _nonce = '1'
-    position_lending_currency_fill_value = web3._extend.utils.toWei('10', 'ether')
-    position_lending_currency_owed_value = web3._extend.utils.toWei('10', 'ether')
+    position_lending_currency_fill_value = web3.utils.toWei('10', 'ether')
+    position_lending_currency_owed_value = web3.utils.toWei('10', 'ether')
     position_hash = await this.protocolContract.position_hash(
       [
         this.lender, this.lender, this.borrower, this.relayer, this.wrangler, this.BorrowToken.address, this.LendToken.address
@@ -229,10 +229,10 @@ contract("Protocol", function (addresses) {
   });
 
   it("should not fill the same kernel with two different positions each with a different nonce and fill_value above available kernel lend currency value", async function() {
-    position_borrow_currency_fill_value = web3._extend.utils.toWei('2', 'ether')
+    position_borrow_currency_fill_value = web3.utils.toWei('2', 'ether')
     _nonce = '1'
-    position_lending_currency_fill_value = web3._extend.utils.toWei('20', 'ether')
-    position_lending_currency_owed_value = web3._extend.utils.toWei('20', 'ether')
+    position_lending_currency_fill_value = web3.utils.toWei('20', 'ether')
+    position_lending_currency_owed_value = web3.utils.toWei('20', 'ether')
     position_hash = await this.protocolContract.position_hash(
       [
         this.lender, this.lender, this.borrower, this.relayer, this.wrangler, this.BorrowToken.address, this.LendToken.address
@@ -279,7 +279,7 @@ contract("Protocol", function (addresses) {
   });
 
   it("should work in the sequence: 1st position, kernel limit minimized, 2nd position", async function() {
-    let _lend_currency_cancel_value = web3._extend.utils.toWei('5', 'ether')
+    let _lend_currency_cancel_value = web3.utils.toWei('5', 'ether')
     tx = this.protocolContract.cancel_kernel(
       this.kernel_addresses, this.kernel_values,
       this.kernel_expires_at, this.kernel_creator_salt, this.kernel_daily_interest_rate, this.kernel_position_duration_in_seconds,
@@ -289,10 +289,10 @@ contract("Protocol", function (addresses) {
     )
     await mineTx(tx);
 
-    position_borrow_currency_fill_value = web3._extend.utils.toWei('0.5', 'ether')
+    position_borrow_currency_fill_value = web3.utils.toWei('0.5', 'ether')
     _nonce = '2'
-    position_lending_currency_fill_value = web3._extend.utils.toWei('5', 'ether')
-    position_lending_currency_owed_value = web3._extend.utils.toWei('5', 'ether')
+    position_lending_currency_fill_value = web3.utils.toWei('5', 'ether')
+    position_lending_currency_owed_value = web3.utils.toWei('5', 'ether')
     position_hash = await this.protocolContract.position_hash(
       [
         this.lender, this.lender, this.borrower, this.relayer, this.wrangler, this.BorrowToken.address, this.LendToken.address
@@ -342,10 +342,10 @@ contract("Protocol", function (addresses) {
 
     // borrower opens 2nd position
 
-    position_borrow_currency_fill_value = web3._extend.utils.toWei('0.3', 'ether')
+    position_borrow_currency_fill_value = web3.utils.toWei('0.3', 'ether')
     _nonce = '2'
-    position_lending_currency_fill_value = web3._extend.utils.toWei('3', 'ether')
-    position_lending_currency_owed_value = web3._extend.utils.toWei('3', 'ether')
+    position_lending_currency_fill_value = web3.utils.toWei('3', 'ether')
+    position_lending_currency_owed_value = web3.utils.toWei('3', 'ether')
     position_hash = await this.protocolContract.position_hash(
       [
         this.lender, this.lender, this.borrower, this.relayer, this.wrangler, this.BorrowToken.address, this.LendToken.address
@@ -390,10 +390,10 @@ contract("Protocol", function (addresses) {
 
     // borrower opens 3rd position
 
-    position_borrow_currency_fill_value = web3._extend.utils.toWei('0.2', 'ether')
+    position_borrow_currency_fill_value = web3.utils.toWei('0.2', 'ether')
     _nonce = '3'
-    position_lending_currency_fill_value = web3._extend.utils.toWei('2', 'ether')
-    position_lending_currency_owed_value = web3._extend.utils.toWei('2', 'ether')
+    position_lending_currency_fill_value = web3.utils.toWei('2', 'ether')
+    position_lending_currency_owed_value = web3.utils.toWei('2', 'ether')
     position_hash = await this.protocolContract.position_hash(
       [
         this.lender, this.lender, this.borrower, this.relayer, this.wrangler, this.BorrowToken.address, this.LendToken.address
@@ -443,9 +443,9 @@ contract("Protocol", function (addresses) {
     // borrower closes 1st position
     //   borrower prepares to repay
     //   set allowance from borrower to protocol contract for loan repayment
-    tx = this.LendToken.mint(this.borrower, web3._extend.utils.toWei('30', 'ether'), {from: addresses[0]})
+    tx = this.LendToken.mint(this.borrower, web3.utils.toWei('30', 'ether'), {from: addresses[0]})
     await mineTx(tx);
-    tx = this.LendToken.approve(this.protocolContract.address, web3._extend.utils.toWei('30', 'ether'), {from: this.borrower})
+    tx = this.LendToken.approve(this.protocolContract.address, web3.utils.toWei('30', 'ether'), {from: this.borrower})
     await mineTx(tx);
     tx = await this.protocolContract.close_position(first_position_1, {from:this.borrower})
     await mineTx(tx);
@@ -463,10 +463,10 @@ contract("Protocol", function (addresses) {
 
     // borrower opens a new position
 
-    position_borrow_currency_fill_value = web3._extend.utils.toWei('0.5', 'ether')
+    position_borrow_currency_fill_value = web3.utils.toWei('0.5', 'ether')
     _nonce = '4'
-    position_lending_currency_fill_value = web3._extend.utils.toWei('5', 'ether')
-    position_lending_currency_owed_value = web3._extend.utils.toWei('5', 'ether')
+    position_lending_currency_fill_value = web3.utils.toWei('5', 'ether')
+    position_lending_currency_owed_value = web3.utils.toWei('5', 'ether')
     position_hash = await this.protocolContract.position_hash(
       [
         this.lender, this.lender, this.borrower, this.relayer, this.wrangler, this.BorrowToken.address, this.LendToken.address
