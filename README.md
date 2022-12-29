@@ -1,12 +1,31 @@
-# protocol.1.0
+# Reloanr package with Lendroid protocol v1.0
+The Reloanr package comprises the following tools. Please feel free to use them (in any combination) to deploy your own fixed-interest, p2p lending ecosystem.
+
+## Smart contracts
 Lendroid Protocol version 1.0
 
-## Framework
 This project is built using the [Truffle Framework](https://truffleframework.com/docs/truffle/overview "Truffle overview"). The smart contracts, originally written in [Solidity](https://solidity.readthedocs.io, "Solidity ReadTheDocs"), have been migrated to [Vyper](https://vyper.readthedocs.io "Vyper ReadTheDocs"). The Vyper contracts have been tested using [Truper](https://github.com/maurelian/truper "Truper's github repo").
 
-Please use semantic Git commits: https://seesparkbox.com/foundry/semantic_commit_messages
+- [Github](https://github.com/lendroidproject/protocol.1.0)
+- [Audit report](https://github.com/lendroidproject/protocol.1.0/blob/master/audit-report.pdf)
+- [PoC](https://app.reloanr.com)
 
-## Installation and setup
+## Javascript library
+Nodejs implementation for user interface to interact with the smart contracts.
+- [Github](https://github.com/lendroidproject/lendroid-js)
+## UI template
+A base template of the user interface.
+- [Github](https://github.com/lendroidproject/reloanr-ui)
+## Kernel server
+An API server implementation on Google Cloud (Python) for shared off-chain (lend / borrow) loan offers
+- [Github](https://github.com/lendroidproject/kernel-server)
+## Wrangler API server
+An API server implementation on Google Cloud (Python) for a simple wrangler
+- [Github](https://github.com/lendroidproject/pywrangler)
+
+## How to use this repo
+
+### Installation and setup
 * Clone this repository
 
   `git clone <repo>`
@@ -31,7 +50,7 @@ Please use semantic Git commits: https://seesparkbox.com/foundry/semantic_commit
 
     `virtualenv -p python3.6 --no-site-packages ~/vyper-venv`
 
-## Test and development
+### Test and development
 
 * Open a new terminal (Terminal 1) and run the Ganache CLI here
 
