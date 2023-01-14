@@ -30,6 +30,6 @@
   "homepage": "https://github.com/lendroidproject/protocol.1.0#readme",
   "devDependencies": {
     "webpack": "^4.26.1",
-    "webpack-cli": "^3.1.2"
+    "webpack-cli": "^3.3.12"
   }
 }
